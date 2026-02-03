@@ -1,0 +1,18 @@
+# Data
+*.json
+*.jsonl
+*.csv
+*.parquet
+
+# Secrets
+.env
+*.key
+
+# OS / tooling
+.DS_Store
+__pycache__/
+.vscode/
+.idea/
+
+# Python
+.venv/
