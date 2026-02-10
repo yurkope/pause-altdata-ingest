@@ -1,18 +1,10 @@
-# Data
-*.json
-*.jsonl
-*.csv
-*.parquet
-
-# Secrets
+# local environment
 .env
-*.key
 
-# OS / tooling
-.DS_Store
-__pycache__/
-.vscode/
-.idea/
+# data artifacts
+data/
 
-# Python
-.venv/
+# logs
+*.log
+logs/
+data/**/logs/
