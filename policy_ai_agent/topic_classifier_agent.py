@@ -72,6 +72,7 @@ Rules:
 - Do not include explanation text.
 """
 
+
 USER_TEMPLATE = """
 Classify this lobbying topic.
 
@@ -84,6 +85,41 @@ Existing canonical issues:
 
 Make the canonical issue stable and reusable across future filings.
 Prefer reusing one of the existing canonical issues whenever possible.
+"""
+
+MERGE_SYSTEM_PROMPT = """
+You review an existing canonical policy taxonomy and suggest whether one canonical issue should merge into another.
+
+Return JSON only with exactly these keys:
+{
+  "source_canonical_issue": "...",
+  "suggested_target_canonical_issue": "...",
+  "merge_confidence_score": 0.000,
+  "merge_reason": "..."
+}
+
+Rules:
+- Only suggest a merge when the source issue is clearly narrower, duplicate, or redundant with the target issue.
+- Prefer keeping the more standard, broader, or already-established target issue.
+- Do not suggest self-merges unless no merge is appropriate.
+- If no merge is appropriate, set suggested_target_canonical_issue equal to source_canonical_issue.
+- merge_confidence_score must be between 0 and 1.
+- Keep merge_reason short and practical.
+- Do not include markdown.
+- Do not include explanation text outside the JSON.
+"""
+
+MERGE_USER_TEMPLATE = """
+Review this canonical policy issue for a possible merge.
+
+source_canonical_issue: {source_issue}
+source_topic_count: {source_count}
+
+Existing canonical issues and topic counts:
+{existing_issue_counts}
+
+If the source issue should be merged into a more stable canonical issue, return that target.
+If no merge is appropriate, return the source issue as the target and set merge_confidence_score below 0.75.
 """
 
 SELECT_SQL = """
@@ -99,6 +135,7 @@ WHERE normalized_topic_text NOT IN (
 ORDER BY total_activity DESC, domains_involved DESC, normalized_topic_text
 LIMIT %s;
 """
+
 
 UPSERT_SQL = """
 INSERT INTO canonical_issue_suggestions_ai (
@@ -124,6 +161,27 @@ DO UPDATE SET
     ai_created_at = CURRENT_TIMESTAMP;
 """
 
+PROMOTE_SQL = """
+INSERT INTO canonical_issue_map (
+    normalized_topic_text,
+    canonical_issue,
+    issue_family,
+    issue_group
+)
+SELECT
+    normalized_topic_text,
+    suggested_canonical_issue,
+    suggested_issue_family,
+    suggested_issue_group
+FROM canonical_issue_suggestions_ai
+WHERE approved = TRUE
+AND normalized_topic_text NOT IN (
+    SELECT normalized_topic_text
+    FROM canonical_issue_map
+);
+"""
+
+
 EXISTING_ISSUES_SQL = """
 SELECT DISTINCT canonical_issue
 FROM canonical_issue_map
@@ -131,10 +189,37 @@ WHERE canonical_issue IS NOT NULL
 ORDER BY canonical_issue;
 """
 
+CANONICAL_COUNTS_SQL = """
+SELECT canonical_issue, COUNT(*) AS topic_count
+FROM canonical_issue_map
+WHERE canonical_issue IS NOT NULL
+GROUP BY canonical_issue
+ORDER BY topic_count DESC, canonical_issue;
+"""
+
+MERGE_SUGGESTIONS_SQL = """
+CREATE TABLE IF NOT EXISTS canonical_issue_merge_suggestions (
+    source_canonical_issue TEXT PRIMARY KEY,
+    suggested_target_canonical_issue TEXT NOT NULL,
+    merge_confidence_score NUMERIC(4,3) NOT NULL,
+    merge_reason TEXT,
+    ai_model TEXT,
+    ai_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed BOOLEAN DEFAULT FALSE,
+    approved BOOLEAN DEFAULT FALSE
+);
+"""
+
+
 def fetch_existing_canonical_issues(conn) -> list[str]:
     with conn.cursor() as cur:
         cur.execute(EXISTING_ISSUES_SQL)
         return [row[0] for row in cur.fetchall() if row[0]]
+
+def fetch_existing_issue_counts(conn) -> list[tuple[str, int]]:
+    with conn.cursor() as cur:
+        cur.execute(CANONICAL_COUNTS_SQL)
+        return cur.fetchall()
 
 def fetch_topics(conn, batch_size: int) -> list[tuple[str, int, int]]:
     with conn.cursor() as cur:
@@ -191,6 +276,105 @@ def save_classification(conn, topic: str, result: dict[str, Any]) -> None:
     conn.commit()
 
 
+
+def promote_approved_suggestions(conn) -> int:
+    with conn.cursor() as cur:
+        cur.execute(PROMOTE_SQL)
+        inserted = cur.rowcount
+    conn.commit()
+    return inserted
+
+def ensure_merge_suggestions_table(conn) -> None:
+    with conn.cursor() as cur:
+        cur.execute(MERGE_SUGGESTIONS_SQL)
+    conn.commit()
+
+
+def classify_merge_candidate(source_issue: str, source_count: int, existing_issue_counts: list[tuple[str, int]]) -> dict[str, Any]:
+    counts_text = "\n".join(f"- {issue}: {count}" for issue, count in existing_issue_counts)
+
+    user_prompt = MERGE_USER_TEMPLATE.format(
+        source_issue=source_issue,
+        source_count=source_count,
+        existing_issue_counts=counts_text,
+    )
+
+    response = client.responses.create(
+        model=OPENAI_MODEL,
+        input=[
+            {"role": "system", "content": MERGE_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    raw = response.output_text.strip()
+    data = json.loads(raw)
+
+    return {
+        "source_canonical_issue": data.get("source_canonical_issue", source_issue),
+        "suggested_target_canonical_issue": data.get("suggested_target_canonical_issue", source_issue),
+        "merge_confidence_score": float(data.get("merge_confidence_score", 0.0)),
+        "merge_reason": data.get("merge_reason"),
+    }
+
+
+def save_merge_suggestion(conn, result: dict[str, Any]) -> None:
+    approved = (
+        result["merge_confidence_score"] >= 0.90
+        and result["suggested_target_canonical_issue"] != result["source_canonical_issue"]
+    )
+
+    sql = """
+    INSERT INTO canonical_issue_merge_suggestions (
+        source_canonical_issue,
+        suggested_target_canonical_issue,
+        merge_confidence_score,
+        merge_reason,
+        ai_model,
+        approved
+    )
+    VALUES (%s, %s, %s, %s, %s, %s)
+    ON CONFLICT (source_canonical_issue)
+    DO UPDATE SET
+        suggested_target_canonical_issue = EXCLUDED.suggested_target_canonical_issue,
+        merge_confidence_score = EXCLUDED.merge_confidence_score,
+        merge_reason = EXCLUDED.merge_reason,
+        ai_model = EXCLUDED.ai_model,
+        approved = EXCLUDED.approved,
+        ai_created_at = CURRENT_TIMESTAMP;
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(
+            sql,
+            (
+                result["source_canonical_issue"],
+                result["suggested_target_canonical_issue"],
+                result["merge_confidence_score"],
+                result["merge_reason"],
+                OPENAI_MODEL,
+                approved,
+            ),
+        )
+    conn.commit()
+
+
+def suggest_canonical_merges(conn) -> int:
+    ensure_merge_suggestions_table(conn)
+    existing_issue_counts = fetch_existing_issue_counts(conn)
+
+    if len(existing_issue_counts) < 2:
+        return 0
+
+    processed = 0
+    for source_issue, source_count in existing_issue_counts:
+        result = classify_merge_candidate(source_issue, source_count, existing_issue_counts)
+        save_merge_suggestion(conn, result)
+        processed += 1
+        time.sleep(SLEEP_SECONDS)
+
+    return processed
+
 def main() -> None:
     print("Connecting to database...")
     conn = psycopg2.connect(DATABASE_URL)
@@ -201,29 +385,33 @@ def main() -> None:
 
         if not topics:
             print("No unmapped topics found.")
-            return
+        else:
+            print(f"Found {len(topics)} topics to classify.")
 
-        print(f"Found {len(topics)} topics to classify.")
+            for i, row in enumerate(topics, start=1):
+                topic, activity, domains = row
+                print(f"[{i}/{len(topics)}] Classifying: {topic[:120]}")
 
-        for i, row in enumerate(topics, start=1):
-            topic, activity, domains = row
-            print(f"[{i}/{len(topics)}] Classifying: {topic[:120]}")
+                try:
+                    result = classify_topic(topic, activity, domains, existing_issues)
+                    save_classification(conn, topic, result)
+                    print(
+                        f"  -> {result['suggested_canonical_issue']} | "
+                        f"{result['suggested_issue_family']} | "
+                        f"{result['suggested_issue_group']} | "
+                        f"{result['confidence_score']:.3f}"
+                    )
+                except Exception as e:
+                    conn.rollback()
+                    print(f"  ERROR: {e}")
 
-            try:
-                result = classify_topic(topic, activity, domains, existing_issues)
-                save_classification(conn, topic, result)
-                print(
-                    f"  -> {result['suggested_canonical_issue']} | "
-                    f"{result['suggested_issue_family']} | "
-                    f"{result['suggested_issue_group']} | "
-                    f"{result['confidence_score']:.3f}"
-                )
-            except Exception as e:
-                conn.rollback()
-                print(f"  ERROR: {e}")
+                time.sleep(SLEEP_SECONDS)
 
-            time.sleep(SLEEP_SECONDS)
+        promoted = promote_approved_suggestions(conn)
+        print(f"Promoted {promoted} approved suggestions into canonical_issue_map.")
 
+        merge_suggestions = suggest_canonical_merges(conn)
+        print(f"Generated {merge_suggestions} canonical merge suggestions.")
         print("Done.")
 
     finally:
