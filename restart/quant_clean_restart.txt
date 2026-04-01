@@ -1,0 +1,123 @@
+QUANT PROJECT — CLEAN RESTART DOCUMENT
+Created: April 1, 2026
+
+========================================
+🚨 IMPORTANT: IGNORE EARLIER CONTRADICTIONS
+========================================
+
+This document has been cleaned to remove conflicting assumptions.
+
+Authoritative truth:
+- DO NOT trust public.v_lobbying_activity_allocated as a source table.
+- Allocation must be rebuilt from base tables.
+
+========================================
+🎯 OBJECTIVE
+========================================
+
+Build a policy pressure / momentum model using lobbying data:
+- Map filings → issues
+- Allocate spend across issues
+- Aggregate to daily time series
+- Compute momentum (30d vs 90d)
+
+========================================
+📊 CURRENT RESUME POINT (AUTHORITATIVE)
+========================================
+
+1. Allocation math is VALIDATED
+2. Trusted base tables:
+   - public.lobbying_filing_lda
+   - public.lobbying_activity_lda
+3. Filing spend:
+   COALESCE(income, expenses)
+4. Allocation rule:
+   COALESCE(f.income, f.expenses) / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+5. Next step:
+   Build issue_daily_spend (canonical_issue × date)
+6. Then:
+   Compute rolling 30d / 90d and momentum
+
+========================================
+🧱 DATA MODEL (TRUSTED)
+========================================
+
+public.lobbying_filing_lda
+- filing_uuid
+- dt_posted
+- income
+- expenses
+
+public.lobbying_activity_lda
+- activity_id
+- filing_uuid
+- activity_idx
+- general_issue
+- issue_desc
+- description
+
+========================================
+💰 ALLOCATION LOGIC (LOCKED)
+========================================
+
+allocated_amount =
+COALESCE(f.income, f.expenses)
+/
+COUNT(*) OVER (PARTITION BY a.filing_uuid)
+
+========================================
+🧪 VALIDATION RESULT (CONFIRMED)
+========================================
+
+total_filing_spend = 20,000,000
+total_allocated_spend = 20,000,000
+
+Conclusion:
+Allocation preserves total spend correctly.
+
+========================================
+📊 NEXT STEP: DAILY AGGREGATION
+========================================
+
+SELECT
+    f.dt_posted::date AS date,
+    a.general_issue AS canonical_issue,
+    SUM(
+        COALESCE(f.income, f.expenses)
+        / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+    ) AS daily_spend
+FROM lobbying_activity_lda a
+JOIN lobbying_filing_lda f
+    ON a.filing_uuid = f.filing_uuid
+WHERE COALESCE(f.income, f.expenses) IS NOT NULL
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+========================================
+📈 MOMENTUM (NEXT)
+========================================
+
+spend30 = rolling 30-day sum
+spend90 = rolling 90-day sum
+
+momentum = spend30 / spend90
+
+========================================
+🔐 ENVIRONMENT CONFIGURATION
+========================================
+
+Location:
+pause-altdata-ingest/.env
+
+Variables:
+DATABASE_URL=postgresql://localhost:5432/pause_altdata
+OPENAI_API_KEY=
+LDA_API_KEY=
+
+Usage:
+source policy_ai_agent/venv/bin/activate
+python policy_ai_agent/ingest_hearing_events.py
+
+========================================
+END DOCUMENT
+========================================

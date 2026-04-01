@@ -1,0 +1,79 @@
+📊 QUANT PROJECT — FULL THEORY & FRAMEWORK
+(Policy Pressure / Momentum System)
+
+1. 🎯 Core Idea
+This system treats policy issues like financial assets.
+- Lobbying spend = capital flow
+- Issues = markets
+- Momentum = price movement
+- Acceleration of spend = signal of future policy movement
+You are measuring pressure and direction, not just activity.
+
+2. 🧠 Conceptual Model
+Pipeline:
+Lobbying Filings → Issue Mapping → Spend Allocation → Time Series Construction → Rolling Windows → Momentum → Composite Signal
+
+3. 🧱 Data Layers
+Layer 1 — Filing (Capital Source)
+- One row per filing
+- Contains total spend
+
+Layer 2 — Activity (Issue Expansion)
+- One filing → multiple issue rows
+
+Layer 3 — Mapping (Normalization)
+- Converts messy data into canonical issues
+
+4. 💰 Allocation Theory
+allocated_amount = total_spend / issue_count
+Preserves total spend and prevents duplication.
+
+5. 🕒 Time Series Construction
+Grain: canonical_issue × date
+Output:
+- date
+- canonical_issue
+- daily_spend
+
+6. 📊 Rolling Windows
+spend30 = last 30 days
+spend90 = last 90 days
+
+7. 📈 Momentum
+momentum = spend30 / spend90
+Use NULLIF to avoid divide-by-zero.
+
+8. 🧮 Log Scaling
+log_score = log(1 + spend30)
+Prevents large spend from dominating.
+
+9. 🧠 Composite Signal
+signal_score = momentum × log(1 + spend30) × weights
+
+10. 🎛️ Tuning Framework
+- Committee dominance
+- Role-weight curve severity
+- Overlap inflation
+- Recency weighting
+- Niche issue weighting
+
+11. ⚠️ Core Risks
+- Mapping duplication
+- Allocation errors
+- Sparse data
+- Time fragmentation
+
+12. 🧠 System Philosophy
+This is a market model of policy pressure.
+
+13. 🔮 Future Extensions
+- Acceleration of momentum
+- Event detection
+- Cross-issue correlation
+- Predictive modeling
+
+14. 🧭 Final Mental Model
+Issues behave like assets competing for capital.
+
+15. 🧠 Key Insight
+Policy moves when attention is accelerating.

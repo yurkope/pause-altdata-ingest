@@ -1,0 +1,1543 @@
+this document was created April 1, 2026 to allow for quicker re-starts with AI assistants
+
+📊 Quant Project — Reconstructed Core Framework
+
+1. 🎯 Objective
+
+Build a policy pressure / influence scoring system that translates lobbying activity into:
+	•	Issue-level momentum
+	•	Relative influence signals
+	•	Forward-looking pressure indicators
+
+⸻
+
+2. 🧱 Core Data Model
+
+Base Input
+
+v_lobbying_activity_allocated
+	•	as_of_date
+	•	general_issue
+	•	description
+	•	allocated_amount
+
+⸻
+
+Mapping Layer
+
+issue_keyword_map
+
+Purpose: Normalize messy lobbying data into canonical issues
+
+Fields:
+	•	code → exact issue match
+	•	keyword → fuzzy match via description
+	•	canonical_issue → standardized bucket
+
+Logic:
+LEFT JOIN issue_keyword_map im
+  ON (im.code = a.general_issue)
+     OR (im.keyword IS NOT NULL
+         AND LOWER(a.description) LIKE '%' || im.keyword || '%')
+
+Fallback:
+
+COALESCE(im.canonical_issue, 'Other')
+
+3. 💰 Spend Aggregation Layer
+
+Rolling Windows
+	•	30-day spend → short-term signal
+	•	90-day spend → baseline signal
+SUM(CASE WHEN as_of_date >= CURRENT_DATE-30 THEN allocated_amount END) → spend30
+SUM(CASE WHEN as_of_date >= CURRENT_DATE-90 THEN allocated_amount END) → spend90
+
+4. 📈 Momentum Concept
+
+Core Idea:
+
+Momentum = Acceleration of spend
+
+Basic Form:
+momentum = spend30 / spend90
+
+Interpretation:
+	•	> 1.0 → accelerating interest
+	•	≈ 1.0 → stable
+	•	< 1.0 → declining
+
+⸻
+
+5. 🧮 Log Scaling (Signal Compression)
+
+You introduced this to:
+	•	Prevent large spend from dominating
+	•	Normalize across issues
+
+Example:
+log_score = LOG(1 + spend30)
+
+6. 🧠 Composite Signal (Your Direction)
+
+This is the key system you were building toward:
+
+signal_score =
+    momentum
+    × log(spend30)
+    × weighting_factors
+
+7. 🎛️ Tuning Dimensions (Critical — You asked to preserve these)
+
+This is your control panel for calibration:
+
+1. Committee Dominance
+	•	Adjust influence of committees vs general lobbying
+	•	Prevent over-weighting highly active committees
+
+⸻
+
+2. Role-Weight Curve Severity
+	•	Nonlinear weighting of actors (e.g., major firms vs small)
+	•	Controls power-law behavior
+
+⸻
+
+3. Overlap Inflation
+	•	Prevent double-counting when:
+	•	multiple keywords hit
+	•	multiple mappings apply
+
+⸻
+
+4. Recency Weighting
+	•	Controls decay curve of influence
+	•	Example:
+
+weight = e^(-λ * days_since_activity)
+
+5. Niche Issue Weighting
+	•	Prevent small issues from disappearing
+	•	Boost low-volume but high-signal topics
+
+⸻
+
+8. 🧩 Allocation Logic (Important Insight You Had)
+
+Each lobbying record can:
+	•	Map to multiple issues
+	•	Require fractional allocation
+
+allocated_amount = total_amount / number_of_matched_issues
+
+
+⸻
+
+9. 🚨 Known Issue (You Hit This)
+
+Error:
+relation "your_mapping_table" does not exist
+
+Root Cause:
+
+Placeholder table name not replaced
+
+Correct Table:
+public.issue_keyword_map
+
+
+⸻
+
+10. 🧱 Your Rolling View (Corrected Structure)
+
+You had a small bug (issue vs canonical_issue), here’s the fixed version:
+CREATE VIEW public.v_lobbying_spend_rolling AS
+WITH alloc AS (
+    SELECT 
+      COALESCE(im.canonical_issue,'Other') AS canonical_issue,
+      a.as_of_date,
+      a.allocated_amount
+    FROM public.v_lobbying_activity_allocated a
+    LEFT JOIN public.issue_keyword_map im
+      ON (im.code = a.general_issue)
+         OR (im.keyword IS NOT NULL
+             AND LOWER(a.description) LIKE '%' || im.keyword || '%')
+)
+SELECT
+  canonical_issue,
+  as_of_date,
+  SUM(CASE WHEN as_of_date >= CURRENT_DATE-30 THEN allocated_amount ELSE 0 END) AS spend30,
+  SUM(CASE WHEN as_of_date >= CURRENT_DATE-90 THEN allocated_amount ELSE 0 END) AS spend90
+FROM alloc
+WHERE canonical_issue IS NOT NULL
+GROUP BY canonical_issue, as_of_date;
+
+11. 🔮 Where You Were Heading (Important)
+
+You were evolving toward:
+
+A market-like system
+
+Where issues behave like:
+	•	assets
+	•	with momentum
+	•	and capital inflow signals
+
+⸻
+
+Future Extensions You Implied:
+	•	Velocity of change (2nd derivative)
+	•	Cross-issue correlation
+	•	Predictive policy movement
+	•	Event detection (spikes)
+
+⸻
+
+✅ What You Should Save (Minimum)
+
+If you only keep a few things, keep these:
+	1.	Mapping table structure
+	2.	Rolling spend logic (30/90)
+	3.	Momentum formula
+	4.	Tuning dimensions (VERY important)
+	5.	Allocation method
+Quant Project — Core Framework to Save
+
+1. Mapping Table Structure
+
+Table: public.issue_keyword_map
+
+Purpose:
+Standardize raw lobbying records into a controlled set of canonical issues.
+
+Suggested fields:
+canonical_issue   text
+code              text
+keyword           text
+weight            numeric   -- optional, for partial weighting later
+is_active         boolean   -- optional
+notes             text      -- optional
+
+How it works:
+	•	code maps directly from structured issue codes
+	•	keyword maps from unstructured description text
+	•	canonical_issue is the final normalized issue bucket
+	•	If nothing matches, fallback goes to 'Other'
+
+Join logic:
+LEFT JOIN public.issue_keyword_map im
+  ON (im.code = a.general_issue)
+     OR (
+          im.keyword IS NOT NULL
+          AND LOWER(a.description) LIKE '%' || LOWER(im.keyword) || '%'
+        )
+
+Fallback logic:
+COALESCE(im.canonical_issue, 'Other')
+
+mportant note:
+This table is the backbone of the model. If the mapping is weak, everything downstream gets noisy.
+
+⸻
+
+2. Rolling Spend Logic (30/90)
+
+Purpose:
+Measure short-term pressure versus medium-term baseline.
+
+Definitions:
+	•	spend30 = total allocated lobbying spend in the last 30 days
+	•	spend90 = total allocated lobbying spend in the last 90 days
+
+Concept:
+	•	30-day spend captures current pressure
+	•	90-day spend captures baseline trend
+	•	Comparing the two gives you acceleration or slowdown
+
+Core pattern:
+SUM(CASE WHEN as_of_date >= CURRENT_DATE - 30 THEN allocated_amount ELSE 0 END) AS spend30,
+SUM(CASE WHEN as_of_date >= CURRENT_DATE - 90 THEN allocated_amount ELSE 0 END) AS spend90
+
+Best practice:
+Aggregate by canonical_issue, not by raw issue fields.
+
+Example view structure:
+DROP VIEW IF EXISTS public.v_lobbying_spend_rolling CASCADE;
+
+CREATE VIEW public.v_lobbying_spend_rolling AS
+WITH alloc AS (
+    SELECT
+        COALESCE(im.canonical_issue, 'Other') AS canonical_issue,
+        a.as_of_date,
+        a.allocated_amount
+    FROM public.v_lobbying_activity_allocated a
+    LEFT JOIN public.issue_keyword_map im
+      ON (im.code = a.general_issue)
+         OR (
+              im.keyword IS NOT NULL
+              AND LOWER(a.description) LIKE '%' || LOWER(im.keyword) || '%'
+            )
+)
+SELECT
+    canonical_issue,
+    SUM(CASE WHEN as_of_date >= CURRENT_DATE - 30 THEN allocated_amount ELSE 0 END) AS spend30,
+    SUM(CASE WHEN as_of_date >= CURRENT_DATE - 90 THEN allocated_amount ELSE 0 END) AS spend90
+FROM alloc
+WHERE canonical_issue IS NOT NULL
+GROUP BY canonical_issue;
+
+3. Momentum Formula
+
+Purpose:
+Translate rolling spend into an interpretable signal of policy pressure.
+
+Base version
+momentum = spend30 / spend90
+
+Interpretation
+	•	> 1.0 = accelerating pressure
+	•	**~ 1.0** = stable pressure
+	•	< 1.0 = weakening pressure
+
+Safer version
+
+To avoid divide-by-zero:
+
+CASE
+  WHEN spend90 = 0 THEN NULL
+  ELSE spend30::numeric / spend90
+END AS momentum
+
+More stable version
+
+To prevent very small denominators from creating fake spikes:
+
+spend30::numeric / NULLIF(spend90, 0)
+
+Optional enhanced version
+
+You were moving toward a combined score:
+
+signal_score = momentum * log(1 + spend30)
+
+That gives you:
+	•	direction from momentum
+	•	magnitude from spend size
+
+⸻
+
+4. Tuning Dimensions (Very Important)
+
+These are the core levers you wanted preserved for calibration.
+
+A. Committee Dominance
+
+Controls whether heavily connected committees overpower the signal.
+
+Use for:
+	•	preventing one institutional channel from dominating
+	•	balancing broad lobbying activity vs concentrated committee influence
+
+⸻
+
+B. Role-Weight Curve Severity
+
+Controls how sharply influence increases with role importance.
+
+Use for:
+	•	deciding whether senior actors get slightly more weight or dramatically more weight
+	•	adjusting the curve from linear to nonlinear
+
+Examples:
+	•	flat weighting
+	•	linear weighting
+	•	exponential/power curve weighting
+
+⸻
+
+C. Overlap Inflation
+
+Controls double-counting when one filing matches multiple issues or multiple keywords.
+
+Use for:
+	•	avoiding artificial inflation of issue pressure
+	•	making multi-match records fair instead of duplicated
+
+⸻
+
+D. Recency Weighting
+
+Controls decay over time so recent activity matters more than older activity.
+
+Use for:
+	•	sharpening the responsiveness of the model
+	•	balancing noise vs speed
+
+Conceptual formula:
+recency_weight = e^(-λ * days_old)
+
+Higher lambda = faster decay
+Lower lambda = slower decay
+
+⸻
+
+E. Niche Issue Weighting
+
+Prevents low-volume but strategically important issues from disappearing.
+
+Use for:
+	•	preserving visibility for smaller topics
+	•	allowing under-covered issues to surface if activity is concentrated or unusual
+
+⸻
+
+5. Allocation Method
+
+Purpose:
+Handle records that map to more than one issue without overstating total spend.
+
+Core rule
+
+If one record maps to multiple issues, divide the amount across them.
+
+Formula
+
+allocated_amount = total_amount / number_of_matched_issues
+
+Example
+
+If a $90,000 filing matches 3 canonical issues:
+
+allocated_amount = 90,000 / 3 = 30,000 per issue
+
+Why this matters
+
+Without allocation:
+	•	one filing counted across 3 issues becomes $270,000 of fake signal
+
+With allocation:
+	•	total spend remains preserved
+	•	issue-level pressure stays realistic
+
+Optional future extension
+
+Weighted allocation instead of equal split:
+
+allocated_amount = total_amount * issue_weight / sum_of_issue_weights
+That would let you favor stronger matches later.
+
+⸻
+
+Short Summary of the Model
+
+The Quant model works like this:
+	1.	Raw lobbying activity is mapped into canonical issues
+	2.	Spend is allocated fairly across matched issues
+	3.	Rolling windows produce 30-day and 90-day spend
+	4.	Momentum compares short-term spend to baseline
+	5.	Tuning levers adjust signal behavior to reduce distortion and improve usefulness
+
+⸻
+
+1. Mapping table structure
+- Table: public.issue_keyword_map
+- Key fields: canonical_issue, code, keyword
+- Purpose: normalize raw issue codes and text descriptions into standardized issue buckets
+- Fallback: COALESCE(canonical_issue, 'Other')
+
+2. Rolling spend logic (30/90)
+- spend30 = sum of allocated_amount for last 30 days
+- spend90 = sum of allocated_amount for last 90 days
+- Used to compare short-term pressure vs baseline trend
+
+3. Momentum formula
+- momentum = spend30 / spend90
+- >1 = accelerating
+- ~1 = stable
+- <1 = declining
+- safer SQL form: spend30::numeric / NULLIF(spend90, 0)
+
+4. Tuning dimensions
+- Committee dominance
+- Role-weight curve severity
+- Overlap inflation
+- Recency weighting
+- Niche issue weighting
+
+5. Allocation method
+- If one filing maps to multiple issues:
+  allocated_amount = total_amount / number_of_matched_issues
+- Prevents double-counting and preserves total spend
+
+Quant Project — Momentum Restart Snapshot
+
+Purpose of This Document
+
+This captures the exact working state of the system during the “momentum restart” thread so development can resume without loss.
+
+⸻
+
+1. Current State of the System
+
+You are actively building:
+	•	A policy pressure scoring engine
+	•	Centered on:
+	•	rolling spend
+	•	momentum
+	•	normalized issue mapping
+
+Primary focus in this phase:
+👉 Get rolling spend + momentum working correctly before layering complexity
+
+⸻
+
+2. What’s Working
+
+A. Allocation Pipeline
+	•	v_lobbying_activity_allocated exists and is functional
+	•	Spend is already:
+	•	mapped
+	•	split across issues
+	•	normalized into allocated_amount
+
+✔️ This is a major milestone — downstream logic depends on this
+
+⸻
+
+B. Mapping Logic (Conceptually Solid)
+	•	Dual mapping approach:
+	•	structured (code)
+	•	unstructured (keyword via description)
+	•	Fallback:
+COALESCE(im.canonical_issue, 'Other')
+
+✔️ Framework is correct
+⚠️ But potential duplication issue exists (see below)
+
+⸻
+
+C. Rolling Spend Concept
+
+You defined:
+	•	30-day window → short-term signal
+	•	90-day window → baseline
+
+✔️ Correct modeling approach
+✔️ Ready for production use once query is fixed
+
+⸻
+
+3. What’s Broken / Needs Fixing
+
+A. ❌ SQL Error: Missing Table
+
+Error:
+relation "your_mapping_table" does not exist
+
+Cause:
+	•	Placeholder name used instead of real table
+
+Fix:
+public.issue_keyword_map
+
+B. ❌ Incorrect Column Reference
+
+In your view:
+SELECT issue AS canonical_issue
+GROUP BY issue
+
+Problem:
+	•	issue does not exist
+	•	Should be:
+canonical_issue
+C. ❌ GROUP BY is Structurally Wrong
+
+Current:
+GROUP BY canonical_issue, as_of_date
+
+Why this is a problem:
+	•	You are fragmenting the data by day
+	•	Rolling windows then recompute per-row
+	•	You do NOT get true rolling aggregation
+
+Effect:
+	•	Momentum signal becomes noisy / incorrect
+	•	Spend is not truly aggregated
+
+⸻
+
+D. ❌ QUALIFY Clause Risk
+QUALIFY issue IS NOT NULL
+
+Problem:
+	•	Not universally supported in Postgres environments
+	•	Also referencing wrong column again
+
+Safer:
+WHERE canonical_issue IS NOT NULL
+
+E. ⚠️ Mapping Duplication Risk (Important)
+
+Your join:
+(im.code = a.general_issue)
+OR (keyword match)
+
+Problem:
+	•	One record can match:
+	•	multiple keywords
+	•	AND a code
+	•	This creates row duplication before allocation
+
+Impact:
+	•	Artificial inflation of spend
+	•	Breaks signal accuracy
+
+⸻
+
+4. Key Decisions You Made
+
+These are important — do NOT lose these.
+
+⸻
+
+A. Allocation Before Aggregation
+
+✔️ Correct order:
+	1.	Map
+	2.	Allocate
+	3.	Aggregate
+
+⸻
+
+B. Momentum = Core Signal
+momentum = spend30 / spend90
+
+✔️ You chose ratio (not delta)
+✔️ Good — scale-independent
+
+⸻
+
+C. Log Scaling Added
+log(1 + spend30)
+
+✔️ Prevents large spend domination
+✔️ Enables cross-issue comparison
+
+⸻
+
+D. System is Becoming “Market-Like”
+
+You are implicitly modeling:
+	•	issues as assets
+	•	spend as capital flow
+	•	momentum as price movement
+
+This is a very strong framing — keep it
+
+⸻
+
+E. Tuning Layer Deferred
+
+You intentionally:
+	•	did NOT over-engineer early
+	•	focused on getting base signals right first
+
+✔️ Correct approach
+
+⸻
+
+5. What You Were About to Fix Next
+
+This is the exact resume point.
+
+⸻
+
+🔧 Priority 1: Fix Rolling Aggregation
+
+Goal:
+
+Aggregate by issue ONLY
+
+Correct structure:
+GROUP BY canonical_issue
+
+NOT:
+GROUP BY canonical_issue, as_of_date
+
+🔧 Priority 2: Fix Mapping Duplication
+
+You need ONE of these strategies:
+
+Option A (Simple)
+	•	Prefer code match over keyword
+	•	Only use keyword if code is NULL
+
+⸻
+
+Option B (Better)
+	•	Rank matches and pick best match
+	•	Use ROW_NUMBER()
+
+⸻
+
+Option C (Future)
+	•	Allow multiple matches
+	•	But enforce controlled allocation
+
+⸻
+
+🔧 Priority 3: Validate Spend Integrity
+
+After fixes:
+	•	Total allocated spend should equal source spend
+	•	No inflation
+
+⸻
+
+🔧 Priority 4: Compute Momentum Cleanly
+
+Add:
+spend30 / NULLIF(spend90, 0)
+6. Clean Target State (Next Step)
+
+You are moving toward:
+
+Output per issue:
+	•	spend30
+	•	spend90
+	•	momentum
+	•	log_score
+	•	signal_score
+
+⸻
+
+7. Immediate Next Step (When You Resume)
+
+Start with:
+
+👉 Fix the rolling view aggregation
+
+Then validate:
+	•	totals
+	•	distribution
+	•	no duplication
+
+⸻
+
+8. Minimal Resume Prompt
+
+When you start the new chat, paste this:
+We are rebuilding the rolling spend + momentum layer.
+
+Current issue:
+- aggregation is grouped by date incorrectly
+- mapping may be duplicating rows
+
+Goal:
+- one row per canonical_issue
+- correct spend30 and spend90
+- no double counting
+
+Start by fixing the SQL view.
+
+Final State
+
+You now have:
+	•	System of Record (architecture)
+	•	Momentum Restart Snapshot (execution state)
+
+✅ Source of Truth (Locked)
+
+👉 Use:
+public.v_lobbying_activity_allocated
+
+Why (based on your actual data)
+	•	lobbying_ld2_raw → 0 rows ❌ (not usable)
+	•	lobbying_filing → 0 rows ❌
+	•	lobbying_activity_lda → 53 rows (intermediate)
+	•	lobbying_filing_lda → 25 rows (intermediate)
+	•	v_lobbying_activity_allocated → 53 rows ✅
+
+👉 This confirms:
+	•	your pipeline is already producing allocated, usable data
+	•	this view is aligned with lobbying_activity_lda
+	•	and it’s the furthest downstream clean dataset
+
+⸻
+
+🧠 What this means for your system
+
+Your pipeline is effectively:
+lobbying_activity_lda
+        ↓
+v_lobbying_activity_allocated   ← START HERE
+        ↓
+rolling spend
+        ↓
+momentum
+        ↓
+signal scoring
+
+✅ What I will lock into your restart doc
+
+Source Table
+public.v_lobbying_activity_allocated
+
+Expected Columns (based on your design)
+	•	as_of_date
+	•	general_issue
+	•	description
+	•	allocated_amount
+	•	canonical_issue (via mapping)
+
+⸻
+
+🎯 Where you resume in new chat
+
+You are NOT figuring out the pipeline anymore.
+
+👉 You are here:
+Step 1: Rolling spend aggregation
+Step 2: Momentum calculation
+Step 3: Fix SQL correctness (grouping + duplication)
+
+🧠 Now the architecture becomes clear
+
+Table roles (confirmed)
+
+1. lobbying_filing_lda ✅
+
+👉 THIS is where the money lives
+	•	filing_id (UUID)
+	•	year / quarter
+	•	client + registrant
+	•	amount ← THIS IS THE KEY
+	•	source link
+
+⸻
+
+2. lobbying_activity_lda ✅
+
+👉 This is issue-level expansion
+	•	same filing_id
+	•	multiple rows per filing
+	•	issue codes (TAX, COM, etc.)
+	•	text
+
+⸻
+
+3. v_lobbying_activity_allocated ❌ (currently broken)
+
+👉 supposed to:
+	•	take filing amount
+	•	divide across issues
+	•	produce allocated dollars
+
+👉 but currently:
+allocated_amount = 0
+
+🎯 The missing link
+
+You are NOT joining filing → activity → allocation
+
+⸻
+
+🧨 This is the core bug
+
+Right now your system is doing:
+activities → mapping → allocation
+
+But it should be:
+filing (amount)
+   ↓
+activity (issue split)
+   ↓
+allocation (divide amount across issues)
+
+💡 What needs to happen
+
+Step 1 — Join filing to activity
+SELECT 
+    a.*,
+    f.amount
+FROM lobbying_activity_lda a
+JOIN lobbying_filing_lda f
+    ON a.filing_uuid = f.filing_uuid
+
+Step 2 — Count issues per filing
+COUNT(*) OVER (PARTITION BY filing_uuid)
+Step 3 — Allocate
+allocated_amount = amount / issue_count
+
+✅ The correct allocation logic
+
+Full version:
+SELECT
+    a.filing_uuid,
+    a.issue_code,
+    f.amount,
+    COUNT(*) OVER (PARTITION BY a.filing_uuid) AS issue_count,
+    f.amount / COUNT(*) OVER (PARTITION BY a.filing_uuid) AS allocated_amount
+FROM lobbying_activity_lda a
+JOIN lobbying_filing_lda f
+    ON a.filing_uuid = f.filing_uuid
+WHERE f.amount IS NOT NULL
+
+🚨 Important nuance
+
+You saw:
+NULL amounts for most filings
+		•	Only some do
+
+So:
+
+You should:
+	•	either filter amount IS NOT NULL
+	•	OR default NULL → 0 (but less useful)
+
+⸻
+
+🧠 What this unlocks
+
+Once fixed:
+
+You get real signals:
+	•	spend by issue
+	•	spend trends
+	•	momentum (your core model)
+
+⸻
+
+🚀 Where you are now (big picture)
+Layer
+Status
+Filing ingestion
+✅ working
+Issue parsing
+✅ working
+Mapping
+✅ working
+Allocation logic
+❌ missing
+Momentum model
+🚫 blocked
+
+What I will lock into the restart doc
+	•	current source table for momentum work: public.v_lobbying_activity_allocated
+	•	filing dollars originate from public.lobbying_filing_lda
+	•	issue expansion originates from public.lobbying_activity_lda
+	•	allocation rule currently is:
+	•	equal split across issues per filing
+	•	using COALESCE(income, expenses) as the source amount
+
+🔥 Locked Design: Daily Issue-Level Time Series
+
+Target grain
+canonical_issue × date
+
+🧠 What this enables (this is the big unlock)
+
+You now get:
+	•	📈 momentum over time (not static totals)
+	•	🔥 early signal detection (spikes before news)
+	•	🧭 policy pressure trends (your core thesis)
+
+⸻
+
+📊 What your next table should look like
+
+Call it something like:
+issue_daily_spend
+
+Columns:
+date
+canonical_issue
+daily_spend
+
+🏗️ How to build it (based on your current data)
+
+You already have everything needed.
+
+Step 1 — Start from your allocation logic
+
+Use:
+COALESCE(f.income, f.expenses)
+
+Step 2 — Add date
+
+Use:
+f.dt_posted::date
+
+Step 3 — Aggregate
+
+Here is your first real production query:
+SELECT
+    f.dt_posted::date AS date,
+    a.general_issue AS canonical_issue,
+    SUM(
+        COALESCE(f.income, f.expenses) 
+        / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+    ) AS daily_spend
+FROM lobbying_activity_lda a
+JOIN lobbying_filing_lda f
+    ON a.filing_uuid = f.filing_uuid
+WHERE COALESCE(f.income, f.expenses) IS NOT NULL
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+⚠️ One important note (subtle but critical)
+
+This line:
+COUNT(*) OVER (PARTITION BY a.filing_uuid)
+is evaluated before aggregation, which is what we want.
+
+So this works correctly.
+
+🚀 What comes next (don’t build yet)
+
+Once this exists:
+
+You can compute:
+
+30-day rolling spend
+SUM(daily_spend) OVER (
+    PARTITION BY canonical_issue
+    ORDER BY date
+    ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+)
+90-day rolling spend
+
+Momentum:
+momentum = spend_30d / spend_90d
+
+🎯 Where you are now
+Layer
+Status
+Filing ingestion
+✅
+Issue parsing
+✅
+Allocation logic
+✅
+Daily aggregation
+🔜 (next step)
+Momentum model
+🔜
+
+🧠 Big picture (important)
+
+You just crossed the line from:
+
+👉 data ingestion project
+
+to
+
+👉 signal generation system
+
+⸻
+
+Next step (one step only)
+
+Run that aggregation query.
+
+Paste a sample of results — I want to confirm:
+	•	dates look right
+	•	issues look right
+	•	spend is non-zero
+
+Then we move to rolling windows (this is where it gets powerful).
+
+This is where I stopped on April 1, 2026
+
+🧠 POLICY ANALYTICS SYSTEM — RESTART CONTEXT
+
+🎯 Objective
+
+Build a policy pressure / momentum model using U.S. lobbying data (LDA) by:
+	•	Mapping lobbying filings → issues
+	•	Allocating spend across issues
+	•	Aggregating to daily time series
+	•	Calculating momentum signals (30d vs 90d)
+
+⸻
+
+🏗️ CURRENT ARCHITECTURE
+
+Database
+	•	Postgres
+	•	Local connection via:
+DATABASE_URL=postgresql://localhost:5432/pause_altdata
+
+Core Tables
+
+1. public.lobbying_filing_lda
+
+Grain: 1 row per filing
+
+Key columns:
+	•	filing_uuid (PK)
+	•	dt_posted (timestamp)
+	•	filing_year
+	•	filing_period
+	•	registrant_name
+	•	client_name
+	•	income (primary spend field)
+	•	expenses (secondary spend field)
+	•	source_url
+
+Important:
+COALESCE(income, expenses) = total filing spend
+
+2. public.lobbying_activity_lda
+
+Grain: 1 row per issue per filing
+
+Key columns:
+	•	activity_id
+	•	filing_uuid (FK → filing table)
+	•	activity_idx (index within filing)
+	•	general_issue (canonical issue code, e.g., TAX, HCR, DEF)
+	•	issue_desc
+	•	description
+	•	government_entities_json
+
+Important:
+	•	A single filing can have multiple issue rows
+	•	This is the issue expansion layer
+
+⸻
+
+3. public.v_lobbying_activity_allocated (conceptual / to fix)
+
+Purpose:
+	•	Allocate filing-level spend across issue rows
+
+Current issue:
+	•	allocated_amount = 0 (not wired correctly yet)
+
+⸻
+
+🔗 DATA FLOW (CRITICAL)
+lobbying_filing_lda (money)
+        ↓
+JOIN on filing_uuid
+        ↓
+lobbying_activity_lda (issues)
+        ↓
+Split spend evenly across issues
+        ↓
+Allocated issue-level spend
+
+💰 ALLOCATION LOGIC (LOCKED)
+
+For each filing:
+issue_count = COUNT(*) OVER (PARTITION BY filing_uuid)
+
+allocated_amount =
+    COALESCE(income, expenses) / issue_count
+
+📊 TARGET DATA MODEL
+
+Table: issue_daily_spend
+
+Grain:
+canonical_issue × date
+
+Columns:
+	•	date (from dt_posted::date)
+	•	canonical_issue (from general_issue)
+	•	daily_spend (sum of allocated amounts)
+
+🧮 DAILY AGGREGATION QUERY
+SELECT
+    f.dt_posted::date AS date,
+    a.general_issue AS canonical_issue,
+    SUM(
+        COALESCE(f.income, f.expenses) 
+        / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+    ) AS daily_spend
+FROM lobbying_activity_lda a
+JOIN lobbying_filing_lda f
+    ON a.filing_uuid = f.filing_uuid
+WHERE COALESCE(f.income, f.expenses) IS NOT NULL
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+📈 NEXT LAYER (NOT BUILT YET)
+
+Rolling Metrics
+
+30-day spend
+SUM(daily_spend) OVER (
+    PARTITION BY canonical_issue
+    ORDER BY date
+    ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+)
+
+90-day spend
+
+Momentum
+momentum = spend_30d / spend_90d
+
+⚠️ KNOWN CONSTRAINTS
+	•	Many filings have NULL spend → must filter:
+WHERE COALESCE(income, expenses) IS NOT NULL
+
+	•	Allocation is currently:
+equal-weight across issues
+
+(no weighting yet)
+🚀 CURRENT STATUS
+Layer
+Status
+Filing ingestion
+✅
+Issue parsing
+✅
+Filing → issue join
+✅
+Allocation logic
+✅
+Daily aggregation
+🔜
+Rolling momentum
+❌
+
+🎯 NEXT STEP AFTER RESTART
+	1.	Run daily aggregation query
+	2.	Validate:
+	•	non-zero spend
+	•	correct issue distribution
+	•	reasonable dates
+	3.	Build rolling 30d / 90d windows
+	4.	Compute momentum
+
+⸻
+
+🧠 KEY INSIGHT
+
+This system transforms:
+raw lobbying filings → forward-looking policy signals
+The core value is detecting where money is accelerating before outcomes appear.
+
+🔥 3 Critical Additions (worth adding)
+
+1. ✅ “Known Good Query” (Validation Anchor)
+
+Right now, if a new AI takes over, it still has to trust the pipeline.
+
+Give it a ground truth check.
+
+Add this:
+
+⸻
+
+🧪 Sanity Check Query (Must Pass)
+WITH alloc AS (
+    SELECT
+        a.filing_uuid,
+        a.general_issue,
+        COALESCE(f.income, f.expenses) AS filing_spend,
+        COUNT(*) OVER (PARTITION BY a.filing_uuid) AS issue_count,
+        COALESCE(f.income, f.expenses) / COUNT(*) OVER (PARTITION BY a.filing_uuid) AS allocated_amount
+    FROM lobbying_activity_lda a
+    JOIN lobbying_filing_lda f
+        ON a.filing_uuid = f.filing_uuid
+    WHERE COALESCE(f.income, f.expenses) IS NOT NULL
+)
+SELECT
+    SUM(filing_spend) AS duplicated_filing_spend,
+    SUM(allocated_amount) AS total_allocated_spend
+FROM alloc;
+
+Expected:
+total_filing_spend == total_allocated_spend
+
+Add this note:
+Sanity check result:
+- duplicated_filing_spend can be larger than true spend because filing-level dollars repeat across issue rows after the join.
+- The correct validation is per filing_uuid:
+    MAX(filing_spend) vs SUM(allocated_amount)
+- When summed across filings, total_filing_spend should equal total_allocated_spend.
+Also add:
+Observed result on April 1, 2026:
+- duplicated_filing_spend = 80,000,000
+- total_allocated_spend = 20,000,000
+Interpretation:
+- one 20,000,000 filing expanded to 4 issue rows
+- allocation logic appears to be working correctly
+Observed result on April 1, 2026:
+- duplicated_filing_spend = 80,000,000
+- total_allocated_spend = 20,000,000
+Interpretation:
+- one 20,000,000 filing expanded to 4 issue rows
+- allocation logic appears to be working correctly
+
+
+That means the allocation math is working.
+
+What to do next
+
+Run the proper equality check:
+WITH alloc AS (
+    SELECT
+        a.filing_uuid,
+        COALESCE(f.income, f.expenses) AS filing_spend,
+        COUNT(*) OVER (PARTITION BY a.filing_uuid) AS issue_count,
+        COALESCE(f.income, f.expenses) / COUNT(*) OVER (PARTITION BY a.filing_uuid) AS allocated_amount
+    FROM lobbying_activity_lda a
+    JOIN lobbying_filing_lda f
+        ON a.filing_uuid = f.filing_uuid
+    WHERE COALESCE(f.income, f.expenses) IS NOT NULL
+),
+filing_totals AS (
+    SELECT filing_uuid, MAX(filing_spend) AS filing_spend
+    FROM alloc
+    GROUP BY filing_uuid
+),
+allocated_totals AS (
+    SELECT filing_uuid, SUM(allocated_amount) AS allocated_spend
+    FROM alloc
+    GROUP BY filing_uuid
+)
+SELECT
+    SUM(filing_totals.filing_spend) AS total_filing_spend,
+    SUM(allocated_totals.allocated_spend) AS total_allocated_spend
+FROM filing_totals
+JOIN allocated_totals USING (filing_uuid);
+
+
+
+What it proves
+
+Your allocation logic is correct for the current non-null spend data:
+	•	total_filing_spend = 20,000,000
+	•	total_allocated_spend = 20,000,000
+
+So the allocation preserves total dollars after splitting across issues.
+
+What to add to your restart document
+Allocation validation confirmed on April 1, 2026:
+
+Query result:
+- total_filing_spend = 20,000,000.00
+- total_allocated_spend = 20,000,000.000000000000
+
+Interpretation:
+- Equal-split allocation across issue rows is preserving total filing spend correctly.
+- The join between lobbying_filing_lda and lobbying_activity_lda is working for filings with non-null spend.
+- Allocation math is validated and can be used as the basis for daily issue-level spend aggregation.
+
+One more high-value addition
+
+Also add this right after it:
+Important implementation note:
+allocated_amount is not a native column in lobbying_activity_lda.
+It must be derived as:
+
+COALESCE(f.income, f.expenses) / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+
+after joining lobbying_activity_lda a
+to lobbying_filing_lda f
+on a.filing_uuid = f.filing_uuid.
+My recommendation
+
+Yes, there is one more thing I would add to ease transition:
+Current resume point:
+- Allocation math is validated.
+- Next step is to build issue_daily_spend at grain:
+    canonical_issue × date
+- Then compute rolling 30-day and 90-day spend windows.
+- Then compute momentum = spend_30d / spend_90d.
+
+
+Yes — a few important fixes will make the restart much smoother. The document is strong, but it still contains some internal contradictions that will trip up a new AI.  
+
+The highest-value changes are these:
+
+First, pick one truth about v_lobbying_activity_allocated and remove the opposite claims. Right now the doc says both that it is the source of truth and that it is broken with allocated_amount = 0. Those cannot both be true. Based on your later validation, the safer restart instruction is:
+As of April 1, 2026, do NOT assume public.v_lobbying_activity_allocated is reliable.
+Use public.lobbying_filing_lda + public.lobbying_activity_lda as the trusted base tables.
+Rebuild allocated_amount from:
+COALESCE(f.income, f.expenses) / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+
+Second, fix the old wrong column names still left in the document. It still says f.amount and a.issue_code in places, but you later proved the real columns are f.income / f.expenses and a.general_issue. Replace those stale examples so the next AI does not repeat the same dead-end.  
+
+Third, fix the .env location section. Your doc says .env must live inside policy_ai_agent/, but your screenshots and later discussion established the repo uses a root-level .env. That is a big one, because a new AI may tell you to move the file. Change it to:
+Repository root:
+pause-altdata-ingest/.env
+
+This repo also contains .env.example at the root.
+Scripts are run from the repo root after activating:
+source policy_ai_agent/venv/bin/activate
+
+Fourth, tighten the current resume point into a single authoritative block near the top. Right now the doc has several restart points. I would add this exact section near the beginning:
+
+CURRENT RESUME POINT (authoritative)
+
+1. Allocation math is validated.
+2. Trusted base tables are:
+   - public.lobbying_filing_lda
+   - public.lobbying_activity_lda
+3. Filing spend field is:
+   COALESCE(income, expenses)
+4. Allocation rule is:
+   COALESCE(f.income, f.expenses) / COUNT(*) OVER (PARTITION BY a.filing_uuid)
+5. Next step:
+   build issue_daily_spend at grain canonical_issue × date
+6. After that:
+   compute rolling 30d and 90d windows, then momentum
+
+Fifth, add one short “known correct schema” section. This will save a lot of back-and-forth:
+Known correct columns:
+
+public.lobbying_filing_lda
+- filing_uuid
+- dt_posted
+- income
+- expenses
+
+public.lobbying_activity_lda
+- activity_id
+- filing_uuid
+- activity_idx
+- general_issue
+- issue_desc
+- description
+- government_entities_json
+
+Sixth, I would remove or quarantine the older speculative sections about GROUP BY canonical_issue only. Your later decision was that the real target grain is canonical_issue × date, so daily aggregation is the correct intermediate layer, and the rolling windows should come after that. Keep that as the canonical design.  
+
+Seventh, add the exact validated equality check result in one clean place, not mixed into commentary:
+
+Allocation validation confirmed on April 1, 2026:
+
+total_filing_spend = 20,000,000.00
+total_allocated_spend = 20,000,000.000000000000
+
+Conclusion:
+Equal-split allocation preserves total filing spend for current non-null spend data.
+
+
+
+
+end April 1, 2026
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+below should not change
+
+🔐 ENVIRONMENT CONFIGURATION (.env)
+
+📁 What the .env file is
+
+A .env file is a local configuration file that stores:
+	•	API keys
+	•	database connections
+	•	runtime settings
+
+👉 It allows your code to:
+	•	stay secure (no hardcoded secrets)
+	•	be portable across machines
+	•	be reproducible in new sessions
+
+⸻
+
+📍 Location
+
+In this project:
+pause-altdata-ingest/
+    policy_ai_agent/
+        .env   ← (this file)
+
+👉 Must live inside policy_ai_agent/ to be picked up by scripts
+
+⸻
+
+📄 Current .env contents
+LDA_API_KEY=
+OPENAI_API_KEY=
+DATABASE_URL=postgresql://localhost:5432/pause_altdata
+OPENAI_MODEL=gpt-5
+TOPIC_BATCH_SIZE=
+TOPIC_SLEEP_SECONDS=
+
+🔑 What each variable does
+
+DATABASE_URL
+postgresql://localhost:5432/pause_altdata
+
+	•	connection string to Postgres
+	•	used by ingestion + analytics scripts
+
+⸻
+
+LDA_API_KEY
+	•	used to pull lobbying filings (Senate API)
+	•	required for ingestion scripts
+
+⸻
+
+OPENAI_API_KEY
+	•	used for:
+	•	topic classification
+	•	AI enrichment
+	•	future signal modeling
+
+⸻
+
+OPENAI_MODEL
+gpt-5
+
+	•	controls which model is used in AI pipelines
+
+⸻
+
+TOPIC_BATCH_SIZE
+	•	controls how many rows are processed per batch
+	•	helps avoid API limits
+
+⸻
+
+TOPIC_SLEEP_SECONDS
+	•	delay between API calls
+	•	prevents throttling / rate limiting
+
+⸻
+
+⚙️ How it is used in code
+
+Typically loaded via:
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+db_url = os.getenv("DATABASE_URL")
+
+🚀 How to use it (step-by-step)
+
+1. Activate your environment
+source policy_ai_agent/venv/bin/activate
+
+2. Run a script
+python policy_ai_agent/ingest_hearing_events.py
+
+👉 The script automatically:
+	•	reads .env
+	•	connects to DB
+	•	uses API keys
+
