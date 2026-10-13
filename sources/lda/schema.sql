@@ -128,3 +128,11 @@ CREATE TABLE IF NOT EXISTS lda.ingest_run (
     filings_processed INTEGER NOT NULL DEFAULT 0,
     error_message TEXT
 );
+
+-- Forward-compatible migrations for databases created by earlier schema versions.
+ALTER TABLE lda.filing
+    ADD COLUMN IF NOT EXISTS source_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE lda.activity
+    ADD COLUMN IF NOT EXISTS foreign_entity_issues JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS source_json JSONB NOT NULL DEFAULT '{}'::jsonb;
