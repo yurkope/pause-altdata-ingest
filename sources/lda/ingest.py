@@ -360,17 +360,45 @@ def main() -> int:
             first_request = False
             results = data.get("results") or []
 
-            with conn.cursor() as cur:
-                for filing in results:
-                    client_id = upsert_client(cur, filing.get("client"))
-                    registrant_id = upsert_registrant(cur, filing.get("registrant"))
-                    upsert_filing(cur, filing, client_id, registrant_id)
-                    replace_activities(cur, filing)
-                    filings_processed += 1
+            # Treat each API page as an idempotent transaction. If Neon drops the
+            # connection during a long backfill, reconnect and replay only this page.
+            # Upserts make replay safe even if a prior COMMIT succeeded but the client
+            # did not receive the acknowledgement.
+            page_rows = len(results)
+            for db_attempt in range(6):
+                try:
+                    if conn.closed:
+                        conn = psycopg2.connect(database_url)
+                    with conn.cursor() as cur:
+                        for filing in results:
+                            client_id = upsert_client(cur, filing.get("client"))
+                            registrant_id = upsert_registrant(cur, filing.get("registrant"))
+                            upsert_filing(cur, filing, client_id, registrant_id)
+                            replace_activities(cur, filing)
 
-                pages += 1
-                update_run(cur, run_id, pages, filings_processed)
-            conn.commit()
+                        next_pages = pages + 1
+                        next_filings = filings_processed + page_rows
+                        update_run(cur, run_id, next_pages, next_filings)
+                    conn.commit()
+                    pages = next_pages
+                    filings_processed = next_filings
+                    break
+                except (psycopg2.OperationalError, psycopg2.InterfaceError) as db_exc:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    if db_attempt == 5:
+                        raise
+                    wait = min(2 ** db_attempt, 30)
+                    print(
+                        f"DB connection lost on page={pages + 1}; "
+                        f"retrying in {wait}s ({db_attempt + 1}/5): {db_exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    time.sleep(wait)
+                    conn = psycopg2.connect(database_url)
 
             print(
                 f"page={pages} page_rows={len(results)} total_rows={filings_processed} "
@@ -392,18 +420,31 @@ def main() -> int:
         return 0
 
     except Exception as exc:
-        conn.rollback()
+        try:
+            if not conn.closed:
+                conn.rollback()
+        except Exception:
+            pass
         if run_id is not None:
             try:
+                if conn.closed:
+                    conn = psycopg2.connect(database_url)
                 with conn.cursor() as cur:
                     finish_run(cur, run_id, "failed", str(exc)[:4000])
                 conn.commit()
             except Exception:
-                conn.rollback()
+                try:
+                    if not conn.closed:
+                        conn.rollback()
+                except Exception:
+                    pass
         print(f"FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
