@@ -178,10 +178,18 @@ def upsert_filing(cur, filing: dict, client_id: Optional[int], registrant_id: Op
 
 
 def replace_activities(cur, filing: dict) -> None:
+    """Upsert activities by filing/index so activity_id remains stable across reruns."""
     filing_uuid = filing["filing_uuid"]
-    cur.execute("DELETE FROM lda.activity WHERE filing_uuid = %s", (filing_uuid,))
+    activities = filing.get("lobbying_activities") or []
 
-    for index, activity in enumerate(filing.get("lobbying_activities") or []):
+    # Remove only source activities that disappeared. Existing matching rows are
+    # updated in place, preserving activity_id for downstream bridge tables.
+    cur.execute(
+        "DELETE FROM lda.activity WHERE filing_uuid = %s AND activity_index >= %s",
+        (filing_uuid, len(activities)),
+    )
+
+    for index, activity in enumerate(activities):
         cur.execute(
             """
             INSERT INTO lda.activity (
@@ -189,6 +197,13 @@ def replace_activities(cur, filing: dict) -> None:
                 general_issue_display, description, foreign_entity_issues,
                 source_json, ingested_at
             ) VALUES (%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP)
+            ON CONFLICT (filing_uuid, activity_index) DO UPDATE SET
+                general_issue_code=EXCLUDED.general_issue_code,
+                general_issue_display=EXCLUDED.general_issue_display,
+                description=EXCLUDED.description,
+                foreign_entity_issues=EXCLUDED.foreign_entity_issues,
+                source_json=EXCLUDED.source_json,
+                ingested_at=CURRENT_TIMESTAMP
             RETURNING activity_id
             """,
             (
@@ -198,6 +213,17 @@ def replace_activities(cur, filing: dict) -> None:
             ),
         )
         activity_id = cur.fetchone()[0]
+
+        # Bridge rows are source snapshots for this activity. Rebuild them while
+        # keeping the stable parent activity_id.
+        cur.execute(
+            "DELETE FROM lda.activity_government_entity WHERE activity_id = %s",
+            (activity_id,),
+        )
+        cur.execute(
+            "DELETE FROM lda.activity_lobbyist WHERE activity_id = %s",
+            (activity_id,),
+        )
 
         for entity in activity.get("government_entities") or []:
             entity_id = entity.get("id")
@@ -266,7 +292,6 @@ def replace_activities(cur, filing: dict) -> None:
                     link.get("new"), Json(link),
                 ),
             )
-
 
 def start_run(cur, year: int, filing_type: Optional[str]) -> int:
     cur.execute(
