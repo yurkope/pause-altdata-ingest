@@ -19,6 +19,7 @@ def parse_args():
     p.add_argument("--year", type=int, required=True)
     p.add_argument("--filing-type", help="Optional LDA filing type such as Q1, Q2, Q3, Q4, RR, RA.")
     p.add_argument("--max-pages", type=int, help="Stop after N pages (useful for smoke tests).")
+    p.add_argument("--start-page", type=int, default=1, help="Start at LDA API page N (useful for resuming backfills).")
     p.add_argument("--sleep", type=float, default=0.0, help="Seconds to sleep between pages.")
     return p.parse_args()
 
@@ -339,7 +340,7 @@ def main() -> int:
 
     conn = psycopg2.connect(database_url)
     run_id = None
-    pages = 0
+    pages = args.start_page - 1
     filings_processed = 0
 
     try:
@@ -348,7 +349,12 @@ def main() -> int:
             run_id = start_run(cur, args.year, args.filing_type)
         conn.commit()
 
+        if args.start_page < 1:
+            raise ValueError("--start-page must be >= 1")
+
         params: Dict[str, Any] = {"filing_year": args.year}
+        if args.start_page > 1:
+            params["page"] = args.start_page
         if args.filing_type:
             params["filing_type"] = args.filing_type
 
@@ -406,7 +412,7 @@ def main() -> int:
                 flush=True,
             )
 
-            if args.max_pages and pages >= args.max_pages:
+            if args.max_pages and (pages - args.start_page + 1) >= args.max_pages:
                 break
 
             url = data.get("next")
