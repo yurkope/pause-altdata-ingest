@@ -50,8 +50,10 @@ CREATE TABLE IF NOT EXISTS lda.filing (
     filing_document_url TEXT,
     filing_document_content_type TEXT,
     posted_by_name TEXT,
-    registrant_id BIGINT REFERENCES lda.registrant(registrant_id),
-    client_id BIGINT REFERENCES lda.client(client_id),
+    registrant_id BIGINT,
+    client_id BIGINT,
+    CONSTRAINT fk_lda_filing_registrant FOREIGN KEY (registrant_id) REFERENCES lda.registrant(registrant_id),
+    CONSTRAINT fk_lda_filing_client FOREIGN KEY (client_id) REFERENCES lda.client(client_id),
     source_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -136,3 +138,28 @@ ALTER TABLE lda.filing
 ALTER TABLE lda.activity
     ADD COLUMN IF NOT EXISTS foreign_entity_issues JSONB NOT NULL DEFAULT '[]'::jsonb,
     ADD COLUMN IF NOT EXISTS source_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+
+-- Retrofit filing foreign keys on databases created by earlier schema versions.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_lda_filing_registrant'
+          AND conrelid = 'lda.filing'::regclass
+    ) THEN
+        ALTER TABLE lda.filing
+            ADD CONSTRAINT fk_lda_filing_registrant
+            FOREIGN KEY (registrant_id) REFERENCES lda.registrant(registrant_id);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_lda_filing_client'
+          AND conrelid = 'lda.filing'::regclass
+    ) THEN
+        ALTER TABLE lda.filing
+            ADD CONSTRAINT fk_lda_filing_client
+            FOREIGN KEY (client_id) REFERENCES lda.client(client_id);
+    END IF;
+END $$;
