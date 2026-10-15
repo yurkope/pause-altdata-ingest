@@ -5,6 +5,7 @@ No writes to production unless --write is explicitly supplied; schema must
 already have been reviewed and applied. Default mode previews resolutions.
 """
 import argparse
+import json
 import os
 import re
 import time
@@ -46,6 +47,35 @@ def extract(description):
             seen.add(key)
             yield key, match.group(0)
 
+
+def committee_activities(committee):
+    """Congress.gov activities are dated events; retain their original payload."""
+    raw = committee.get("activities") or []
+    if isinstance(raw, dict):
+        raw = raw.get("items", raw.get("item", []))
+    if not isinstance(raw, list):
+        return []
+    return [event for event in raw if isinstance(event, dict)]
+
+
+def committee_evidence(committee):
+    events = committee_activities(committee)
+    names = [str(event.get("name", "")).strip() for event in events]
+    referral = any(name in ("Referred to", "Re-Referred to", "Committed to",
+                            "Re-Committed to") for name in names)
+    substantive = any(name in ("Hearings by", "Markup by", "Reported by",
+                               "Reported original measure") for name in names)
+    return {
+        "committee_code": committee.get("systemCode"),
+        "chamber": committee.get("chamber"),
+        "events": events,
+        "event_types": sorted(set(name for name in names if name)),
+        "has_referral": referral,
+        "has_substantive_action": substantive,
+        "evidence_class": ("substantive_action" if substantive else
+                           "referral_only" if referral else "other_or_unknown"),
+        "source": committee,
+    }
 
 def main():
     parser = argparse.ArgumentParser()
@@ -93,7 +123,19 @@ def main():
                 title = bill.get("title", "")
                 committees = api(session, key, f"/bill/{args.congress}/{typ.lower()}/{number}/committees").get("committees", [])
                 names = [c.get("name", "?") for c in committees]
+                evidence_rows = [committee_evidence(c) for c in committees]
+                substantive = [c.get("name") for c, e in zip(committees, evidence_rows)
+                               if e["has_substantive_action"]]
+                referral_only = [c.get("name") for c, e in zip(committees, evidence_rows)
+                                 if e["evidence_class"] == "referral_only"]
+                unknown = [c.get("name") for c, e in zip(committees, evidence_rows)
+                           if e["evidence_class"] == "other_or_unknown"]
                 print(f"{typ} {number} | {count} activities | {title} | committees={names}")
+                print(f"  evidence: substantive={substantive}; referral_only={referral_only}; other={unknown}")
+                if len(committees) > 5:
+                    print("  WARNING: broad multi-committee association; exclude from equal-weight pressure allocation")
+                if any(not e["committee_code"] for e in evidence_rows):
+                    print("  WARNING: missing committee systemCode; cannot persist those relationships")
                 if not args.write:
                     continue
                 with conn.cursor() as cur:
@@ -104,7 +146,7 @@ def main():
                            DO UPDATE SET title=EXCLUDED.title, congress_url=EXCLUDED.congress_url,
                            source_json=EXCLUDED.source_json,verified_at=now()""",
                         (args.congress, typ, number, title, bill.get("url"),
-                         __import__("json").dumps(bill)),
+                         json.dumps(bill)),
                     )
                     for activity_id, matched in evidence[(typ, number)]:
                         cur.execute(
@@ -127,7 +169,7 @@ def main():
                                name=EXCLUDED.name,chamber=EXCLUDED.chamber,
                                source_json=EXCLUDED.source_json""",
                             (code,c.get("name",""),c.get("chamber"),
-                             __import__("json").dumps(c)),
+                             json.dumps(c)),
                         )
                         cur.execute(
                             """INSERT INTO policy.bill_committee
@@ -136,7 +178,7 @@ def main():
                                ON CONFLICT(congress,bill_type,bill_number,committee_code)
                                DO UPDATE SET activity_json=EXCLUDED.activity_json""",
                             (args.congress,typ,number,code,
-                             __import__("json").dumps(c.get("activities",[]))),
+                             json.dumps(committee_evidence(c))),
                         )
                 conn.commit()
             except Exception as exc:
