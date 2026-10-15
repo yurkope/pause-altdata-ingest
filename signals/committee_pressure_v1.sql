@@ -74,13 +74,14 @@ bill_breadth AS (
     GROUP BY e.committee_code
 ),
 lobbyist_breadth AS (
+    -- Count lobbyists attached to the activities that actually contain an
+    -- eligible bill mention, not every lobbyist on every activity in the filing.
     SELECT
-        fc.committee_code,
+        e.committee_code,
         COUNT(DISTINCT al.lobbyist_id) AS distinct_lobbyists
-    FROM filing_committee fc
-    JOIN lda.activity a USING (filing_uuid)
+    FROM eligible_activity_committee e
     JOIN lda.activity_lobbyist al USING (activity_id)
-    GROUP BY fc.committee_code
+    GROUP BY e.committee_code
 ),
 raw AS (
     SELECT
