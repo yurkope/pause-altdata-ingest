@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS policy.bill_mention (
   bill_type text NOT NULL,
   bill_number integer NOT NULL,
   evidence text NOT NULL,
+  evidence_context text,
+  resolution_method text,
+  resolution_confidence numeric(4,3),
   resolution_status text NOT NULL CHECK (resolution_status IN ('candidate','verified','ambiguous','rejected')),
   PRIMARY KEY(activity_id,congress,bill_type,bill_number),
   FOREIGN KEY(congress,bill_type,bill_number)
