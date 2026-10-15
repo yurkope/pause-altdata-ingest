@@ -90,11 +90,7 @@ def main():
     parser.add_argument("--congress", type=int, default=119)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--write", action="store_true")
-    parser.add_argument("--confirm-congress-context", action="store_true",
-                        help="Required for writes: manually confirm bill mentions refer to selected Congress")
     args = parser.parse_args()
-    if args.write and not args.confirm_congress_context:
-        raise SystemExit("Refusing writes: bill number alone cannot resolve Congress. Confirm context first.")
     load_dotenv()
     db_url, key = os.getenv("DATABASE_URL"), os.getenv("CONGRESS_API_KEY")
     if not db_url or not key:
@@ -117,7 +113,7 @@ def main():
     for activity_id, description in rows:
         for (typ, number), matched in extract(description):
             counts[(typ, number)] += 1
-            evidence.setdefault((typ, number), []).append((activity_id, matched))
+            evidence.setdefault((typ, number), []).append((activity_id, matched, description))
     session = requests.Session()
     try:
         for (typ, number), count in counts.most_common(args.top):
@@ -148,6 +144,9 @@ def main():
                     print("  WARNING: broad multi-committee association; only substantive committees are pressure-eligible")
                 if any(not e["committee_code"] for e in evidence_rows):
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
+                statuses = Counter(mention_status(desc, args.congress)
+                                   for _, _, desc in evidence[(typ, number)])
+                print(f"  mention_status={dict(statuses)}")
                 if not args.write:
                     continue
                 with conn.cursor() as cur:
@@ -160,15 +159,16 @@ def main():
                         (args.congress, typ, number, title, bill.get("url"),
                          json.dumps(bill)),
                     )
-                    for activity_id, matched in evidence[(typ, number)]:
+                    for activity_id, matched, description in evidence[(typ, number)]:
+                        status = mention_status(description, args.congress)
                         cur.execute(
                             """INSERT INTO policy.bill_mention
                                (activity_id,congress,bill_type,bill_number,evidence,resolution_status)
-                               VALUES (%s,%s,%s,%s,%s,'verified')
+                               VALUES (%s,%s,%s,%s,%s,%s)
                                ON CONFLICT(activity_id,congress,bill_type,bill_number)
                                DO UPDATE SET evidence=EXCLUDED.evidence,
                                resolution_status=EXCLUDED.resolution_status""",
-                            (activity_id,args.congress,typ,number,matched),
+                            (activity_id,args.congress,typ,number,matched,status),
                         )
                     for c in committees:
                         code = c.get("systemCode")
