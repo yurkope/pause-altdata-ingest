@@ -54,7 +54,11 @@ def main():
     parser.add_argument("--congress", type=int, default=119)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--confirm-congress-context", action="store_true",
+                        help="Required for writes: manually confirm bill mentions refer to selected Congress")
     args = parser.parse_args()
+    if args.write and not args.confirm_congress_context:
+        raise SystemExit("Refusing writes: bill number alone cannot resolve Congress. Confirm context first.")
     load_dotenv()
     db_url, key = os.getenv("DATABASE_URL"), os.getenv("CONGRESS_API_KEY")
     if not db_url or not key:
@@ -72,6 +76,8 @@ def main():
         rows = cur.fetchall()
     counts = Counter()
     evidence = {}
+    # Caution: count-level discovery does not prove every mention refers to
+    # the selected Congress; bill numbers repeat every two years.
     for activity_id, description in rows:
         for (typ, number), matched in extract(description):
             counts[(typ, number)] += 1
