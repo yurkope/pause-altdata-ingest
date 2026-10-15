@@ -76,6 +76,10 @@ def committee_evidence(committee):
         "has_substantive_action": substantive,
         "evidence_class": ("substantive_action" if substantive else
                            "referral_only" if referral else "other_or_unknown"),
+        # Conservative pressure eligibility: substantive action is strongest.
+        # A sole committee with no classified event remains usable as
+        # jurisdiction evidence, but broad unclassified referrals are not.
+        "pressure_eligible": substantive,
         "source": committee,
     }
 
@@ -134,8 +138,14 @@ def main():
                            if e["evidence_class"] == "other_or_unknown"]
                 print(f"{typ} {number} | {count} activities | {title} | committees={names}")
                 print(f"  evidence: substantive={substantive}; referral_only={referral_only}; other={unknown}")
+                if len(committees) == 1 and evidence_rows[0]["evidence_class"] == "other_or_unknown":
+                    evidence_rows[0]["pressure_eligible"] = True
+                    print("  NOTE: sole committee retained as jurisdiction evidence despite unclassified activity")
+                eligible = [c.get("name") for c, e in zip(committees, evidence_rows)
+                            if e["pressure_eligible"]]
+                print(f"  pressure_eligible={eligible}")
                 if len(committees) > 5:
-                    print("  WARNING: broad multi-committee association; exclude from equal-weight pressure allocation")
+                    print("  WARNING: broad multi-committee association; only substantive committees are pressure-eligible")
                 if any(not e["committee_code"] for e in evidence_rows):
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
                 if not args.write:
