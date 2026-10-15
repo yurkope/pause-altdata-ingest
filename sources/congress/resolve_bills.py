@@ -61,10 +61,12 @@ def committee_activities(committee):
 def committee_evidence(committee):
     events = committee_activities(committee)
     names = [str(event.get("name", "")).strip() for event in events]
-    referral = any(name in ("Referred to", "Re-Referred to", "Committed to",
-                            "Re-Committed to") for name in names)
-    substantive = any(name in ("Hearings by", "Markup by", "Reported by",
-                               "Reported original measure") for name in names)
+    normalized = [re.sub(r"\\s+", " ", name).casefold() for name in names]
+    referral = any(name in {"referred to", "re-referred to", "committed to",
+                            "re-committed to"} for name in normalized)
+    substantive = any(name in {"hearings by", "hearing by", "markup by",
+                               "reported by", "reported original measure"}
+                      for name in normalized)
     return {
         "committee_code": committee.get("systemCode"),
         "chamber": committee.get("chamber"),
