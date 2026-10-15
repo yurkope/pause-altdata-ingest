@@ -103,6 +103,8 @@ def main():
     parser.add_argument("--quarter", default="Q4")
     parser.add_argument("--congress", type=int, default=119)
     parser.add_argument("--top", type=int, default=200)
+    parser.add_argument("--rank-by", choices=["mentions", "dollars", "hybrid"], default="mentions",
+                        help="Prioritize bill tokens by mention count, allocated filing dollars, or hybrid rank.")
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
     load_dotenv()
@@ -113,7 +115,8 @@ def main():
     conn.autocommit = False
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT a.activity_id,a.description
+            """SELECT a.activity_id,a.description,a.filing_uuid,
+                      COALESCE(f.income,f.expenses,0)
                FROM lda.activity a JOIN lda.filing f USING(filing_uuid)
                WHERE f.filing_year=%s AND f.filing_type=%s
                  AND a.description IS NOT NULL""",
@@ -122,18 +125,41 @@ def main():
         rows = cur.fetchall()
     counts = Counter()
     evidence = {}
+    filing_amount = {}
+    filing_tokens = {}
     # Caution: count-level discovery does not prove every mention refers to
     # the selected Congress; bill numbers repeat every two years.
-    for activity_id, description in rows:
+    for activity_id, description, filing_uuid, amount in rows:
+        filing_amount[filing_uuid] = float(amount or 0)
+        activity_tokens = []
         for (typ, number), matched in extract(description):
             counts[(typ, number)] += 1
             evidence.setdefault((typ, number), []).append((activity_id, matched, description))
+            activity_tokens.append((typ, number))
+        filing_tokens.setdefault(filing_uuid, set()).update(activity_tokens)
+
+    dollar_score = Counter()
+    for filing_uuid, tokens in filing_tokens.items():
+        if tokens:
+            share = filing_amount.get(filing_uuid, 0.0) / len(tokens)
+            for token in tokens:
+                dollar_score[token] += share
+
+    if args.rank_by == "dollars":
+        ranked = sorted(counts, key=lambda x: (dollar_score[x], counts[x]), reverse=True)
+    elif args.rank_by == "hybrid":
+        by_mentions = {k: i for i, (k, _) in enumerate(counts.most_common(), 1)}
+        by_dollars = {k: i for i, k in enumerate(sorted(counts, key=lambda x: dollar_score[x], reverse=True), 1)}
+        ranked = sorted(counts, key=lambda x: (by_mentions[x] + by_dollars[x], -counts[x]))
+    else:
+        ranked = [k for k, _ in counts.most_common()]
     session = requests.Session()
     resolved_bills = 0
     skipped_bills = 0
     mention_totals = Counter()
     try:
-        for (typ, number), count in counts.most_common(args.top):
+        for typ, number in ranked[:args.top]:
+            count = counts[(typ, number)]
             try:
                 bill = api(session, key, f"/bill/{args.congress}/{typ.lower()}/{number}").get("bill", {})
                 if not bill or int(bill.get("number", 0)) != number:
