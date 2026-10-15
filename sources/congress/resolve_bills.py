@@ -17,7 +17,28 @@ from dotenv import load_dotenv
 
 BASE = "https://api.congress.gov/v3"
 PATTERN = re.compile(r"(?<![A-Za-z0-9])(H\.?\s*R\.?|S\.?)\s*[-#:]?\s*(\d{1,6})(?!\d)", re.I)
-CONGRESS_PATTERN = re.compile(r"\\b(\\d{3})(?:st|nd|rd|th)\\s+Congress\\b", re.I)
+CONGRESS_PATTERN = re.compile(r"\\b(\\d{3})(?:st|nd|rd|th)?\\s+Congress\\b", re.I)
+
+def mention_window(description, start, end, radius=220):
+    """Compact auditable context around the exact bill token."""
+    text = description or ""
+    left = max(0, start - radius)
+    right = min(len(text), end + radius)
+    snippet = re.sub(r"\\s+", " ", text[left:right]).strip()
+    return ("…" if left else "") + snippet + ("…" if right < len(text) else "")
+
+
+def mention_resolution(description, start, end, selected_congress):
+    """Classify Congress context locally around one bill mention."""
+    window = mention_window(description, start, end)
+    explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
+    if selected_congress in explicit and len(explicit) == 1:
+        return "verified", "explicit_congress_local", 1.0, window
+    if explicit and selected_congress not in explicit:
+        return "rejected", "conflicting_congress_local", 1.0, window
+    if len(explicit) > 1:
+        return "ambiguous", "multiple_congress_local", 0.5, window
+    return "candidate", "bill_token_only", 0.25, window
 
 
 def mention_status(description, selected_congress):
@@ -59,7 +80,7 @@ def extract(description):
         key = (typ, int(match.group(2)))
         if key not in seen:
             seen.add(key)
-            yield key, match.group(0)
+            yield key, match.group(0), match.start(), match.end()
 
 
 def committee_activities(committee):
@@ -132,9 +153,11 @@ def main():
     for activity_id, description, filing_uuid, amount in rows:
         filing_amount[filing_uuid] = float(amount or 0)
         activity_tokens = []
-        for (typ, number), matched in extract(description):
+        for (typ, number), matched, start, end in extract(description):
             counts[(typ, number)] += 1
-            evidence.setdefault((typ, number), []).append((activity_id, matched, description))
+            evidence.setdefault((typ, number), []).append(
+                (activity_id, matched, description, start, end)
+            )
             activity_tokens.append((typ, number))
         filing_tokens.setdefault(filing_uuid, set()).update(activity_tokens)
 
@@ -188,8 +211,8 @@ def main():
                     print("  WARNING: broad multi-committee association; only substantive committees are pressure-eligible")
                 if any(not e["committee_code"] for e in evidence_rows):
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
-                statuses = Counter(mention_status(desc, args.congress)
-                                   for _, _, desc in evidence[(typ, number)])
+                statuses = Counter(mention_resolution(desc, start, end, args.congress)[0]
+                                   for _, _, desc, start, end in evidence[(typ, number)])
                 resolved_bills += 1
                 mention_totals.update(statuses)
                 print(f"  mention_status={dict(statuses)}")
@@ -205,16 +228,22 @@ def main():
                         (args.congress, typ, number, title, bill.get("url"),
                          json.dumps(bill)),
                     )
-                    for activity_id, matched, description in evidence[(typ, number)]:
-                        status = mention_status(description, args.congress)
+                    for activity_id, matched, description, start, end in evidence[(typ, number)]:
+                        status, method, confidence, context = mention_resolution(
+                            description, start, end, args.congress
+                        )
                         cur.execute(
                             """INSERT INTO policy.bill_mention
-                               (activity_id,congress,bill_type,bill_number,evidence,resolution_status)
-                               VALUES (%s,%s,%s,%s,%s,%s)
+                               (activity_id,congress,bill_type,bill_number,evidence,resolution_status,
+                                evidence_context,resolution_method,resolution_confidence)
+                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                                ON CONFLICT(activity_id,congress,bill_type,bill_number)
                                DO UPDATE SET evidence=EXCLUDED.evidence,
-                               resolution_status=EXCLUDED.resolution_status""",
-                            (activity_id,args.congress,typ,number,matched,status),
+                               resolution_status=EXCLUDED.resolution_status,
+                               evidence_context=EXCLUDED.evidence_context,
+                               resolution_method=EXCLUDED.resolution_method,
+                               resolution_confidence=EXCLUDED.resolution_confidence""",
+                            (activity_id,args.congress,typ,number,matched,status,context,method,confidence),
                         )
                     for c in committees:
                         code = c.get("systemCode")
