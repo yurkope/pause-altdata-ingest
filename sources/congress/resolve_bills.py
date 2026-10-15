@@ -102,7 +102,7 @@ def main():
     parser.add_argument("--year", type=int, default=2025)
     parser.add_argument("--quarter", default="Q4")
     parser.add_argument("--congress", type=int, default=119)
-    parser.add_argument("--top", type=int, default=20)
+    parser.add_argument("--top", type=int, default=200)
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
     load_dotenv()
@@ -129,12 +129,16 @@ def main():
             counts[(typ, number)] += 1
             evidence.setdefault((typ, number), []).append((activity_id, matched, description))
     session = requests.Session()
+    resolved_bills = 0
+    skipped_bills = 0
+    mention_totals = Counter()
     try:
         for (typ, number), count in counts.most_common(args.top):
             try:
                 bill = api(session, key, f"/bill/{args.congress}/{typ.lower()}/{number}").get("bill", {})
                 if not bill or int(bill.get("number", 0)) != number:
                     print(f"SKIP {typ} {number}: bill not verified")
+                    skipped_bills += 1
                     continue
                 title = bill.get("title", "")
                 committees = api(session, key, f"/bill/{args.congress}/{typ.lower()}/{number}/committees").get("committees", [])
@@ -160,6 +164,8 @@ def main():
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
                 statuses = Counter(mention_status(desc, args.congress)
                                    for _, _, desc in evidence[(typ, number)])
+                resolved_bills += 1
+                mention_totals.update(statuses)
                 print(f"  mention_status={dict(statuses)}")
                 if not args.write:
                     continue
@@ -213,6 +219,8 @@ def main():
                 if args.write:
                     raise
     finally:
+        print(f"SUMMARY resolved_bills={resolved_bills} skipped_bills={skipped_bills} "
+              f"mention_status={dict(mention_totals)}")
         session.close()
         conn.close()
 
