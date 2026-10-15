@@ -117,11 +117,11 @@ SELECT
     distinct_lobbyists,
     distinct_bills,
     ROUND(allocated_amount, 2) AS candidate_associated_allocated_amount,
-    ROUND(100 * (
+    ROUND((100 * (
         0.45 * amount_pct +
         0.25 * clients_pct +
         0.20 * lobbyists_pct +
         0.10 * bills_pct
-    ), 1) AS committee_pressure_score
+    ))::numeric, 1) AS committee_pressure_score
 FROM ranked
 ORDER BY committee_pressure_score DESC, allocated_amount DESC;
