@@ -17,6 +17,20 @@ from dotenv import load_dotenv
 
 BASE = "https://api.congress.gov/v3"
 PATTERN = re.compile(r"(?<![A-Za-z0-9])(H\.?\s*R\.?|S\.?)\s*[-#:]?\s*(\d{1,6})(?!\d)", re.I)
+CONGRESS_PATTERN = re.compile(r"\\b(\\d{3})(?:st|nd|rd|th)\\s+Congress\\b", re.I)
+
+
+def mention_status(description, selected_congress):
+    """Resolve only explicit Congress context; otherwise retain as a candidate."""
+    explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(description or "")}
+    if selected_congress in explicit and len(explicit) == 1:
+        return "verified"
+    if explicit and selected_congress not in explicit:
+        return "rejected"
+    if len(explicit) > 1:
+        return "ambiguous"
+    return "candidate"
+
 
 
 def api(session, key, path):
