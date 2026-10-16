@@ -42,15 +42,21 @@ def title_evidence(window, title):
     return sum(w in window_words for w in set(title_words)) / len(set(title_words))
 
 
+PUBLIC_LAW_PATTERN = re.compile(r"\\bP(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–](\\d+)\\b", re.I)
+
+
 def mention_resolution(description, start, end, selected_congress, title=""):
     """Classify Congress context locally; title evidence may strengthen candidates."""
     window = mention_window(description, start, end)
     explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
-    if selected_congress in explicit and len(explicit) == 1:
-        return "verified", "explicit_congress_local", 1.0, window
-    if explicit and selected_congress not in explicit:
+    public_law_congresses = {int(m.group(1)) for m in PUBLIC_LAW_PATTERN.finditer(window)}
+    congress_evidence = explicit | public_law_congresses
+    if selected_congress in congress_evidence and len(congress_evidence) == 1:
+        method = "explicit_congress_local" if selected_congress in explicit else "public_law_congress_local"
+        return "verified", method, 1.0, window
+    if congress_evidence and selected_congress not in congress_evidence:
         return "rejected", "conflicting_congress_local", 1.0, window
-    if len(explicit) > 1:
+    if len(congress_evidence) > 1:
         return "ambiguous", "multiple_congress_local", 0.5, window
     overlap = title_evidence(window, title)
     if overlap >= 0.80:
