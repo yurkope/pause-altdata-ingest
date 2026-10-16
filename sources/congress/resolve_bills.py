@@ -28,8 +28,22 @@ def mention_window(description, start, end, radius=220):
     return ("…" if left else "") + snippet + ("…" if right < len(text) else "")
 
 
-def mention_resolution(description, start, end, selected_congress):
-    """Classify Congress context locally around one bill mention."""
+def normalized_words(text):
+    return re.findall(r"[a-z0-9]+", (text or "").casefold())
+
+
+def title_evidence(window, title):
+    """Conservative lexical support; excludes generic stopwords and year alone."""
+    stop = {"the","and","of","for","to","in","a","an","act","bill","resolution","2025","2026"}
+    title_words = [w for w in normalized_words(title) if w not in stop and len(w) >= 4]
+    window_words = set(normalized_words(window))
+    if not title_words:
+        return 0.0
+    return sum(w in window_words for w in set(title_words)) / len(set(title_words))
+
+
+def mention_resolution(description, start, end, selected_congress, title=""):
+    """Classify Congress context locally; title evidence may strengthen candidates."""
     window = mention_window(description, start, end)
     explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
     if selected_congress in explicit and len(explicit) == 1:
@@ -38,6 +52,11 @@ def mention_resolution(description, start, end, selected_congress):
         return "rejected", "conflicting_congress_local", 1.0, window
     if len(explicit) > 1:
         return "ambiguous", "multiple_congress_local", 0.5, window
+    overlap = title_evidence(window, title)
+    if overlap >= 0.80:
+        return "candidate", "title_strong_local", 0.85, window
+    if overlap >= 0.55:
+        return "candidate", "title_moderate_local", 0.65, window
     return "candidate", "bill_token_only", 0.25, window
 
 
@@ -211,7 +230,7 @@ def main():
                     print("  WARNING: broad multi-committee association; only substantive committees are pressure-eligible")
                 if any(not e["committee_code"] for e in evidence_rows):
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
-                statuses = Counter(mention_resolution(desc, start, end, args.congress)[0]
+                statuses = Counter(mention_resolution(desc, start, end, args.congress, title)[0]
                                    for _, _, desc, start, end in evidence[(typ, number)])
                 resolved_bills += 1
                 mention_totals.update(statuses)
@@ -230,7 +249,7 @@ def main():
                     )
                     for activity_id, matched, description, start, end in evidence[(typ, number)]:
                         status, method, confidence, context = mention_resolution(
-                            description, start, end, args.congress
+                            description, start, end, args.congress, title
                         )
                         cur.execute(
                             """INSERT INTO policy.bill_mention
