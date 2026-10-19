@@ -17,14 +17,14 @@ from dotenv import load_dotenv
 
 BASE = "https://api.congress.gov/v3"
 PATTERN = re.compile(r"(?<![A-Za-z0-9])(H\.?\s*R\.?|S\.?)\s*[-#:]?\s*(\d{1,6})(?!\d)", re.I)
-CONGRESS_PATTERN = re.compile(r"\\b(\\d{3})(?:st|nd|rd|th)?\\s+Congress\\b", re.I)
+CONGRESS_PATTERN = re.compile(r"\b(\d{3})(?:st|nd|rd|th)?\s+Congress\b", re.I)
 
 def mention_window(description, start, end, radius=220):
     """Compact auditable context around the exact bill token."""
     text = description or ""
     left = max(0, start - radius)
     right = min(len(text), end + radius)
-    snippet = re.sub(r"\\s+", " ", text[left:right]).strip()
+    snippet = re.sub(r"\s+", " ", text[left:right]).strip()
     return ("…" if left else "") + snippet + ("…" if right < len(text) else "")
 
 
@@ -42,12 +42,12 @@ def title_evidence(window, title):
     return sum(w in window_words for w in set(title_words)) / len(set(title_words))
 
 
-PUBLIC_LAW_PATTERN = re.compile(r"\\bP(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–](\\d+)\\b", re.I)
+PUBLIC_LAW_PATTERN = re.compile(r"\bP(?:ublic|ub)?\.?\s*L(?:aw)?\.?\s*(\d{3})[-–](\d+)\b", re.I)
 PUBLIC_LAW_LINK_PATTERN = re.compile(
-    r"(?:P(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–]\\d+[^.;]{0,90}"
-    r"(?:H\\.?\\s*R\\.?|S\\.?)\\s*[-#:]?\\s*\\d{1,6}|"
-    r"(?:H\\.?\\s*R\\.?|S\\.?)\\s*[-#:]?\\s*\\d{1,6}[^.;]{0,90}"
-    r"P(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–]\\d+)",
+    r"(?:P(?:ublic|ub)?\.?\s*L(?:aw)?\.?\s*(\d{3})[-–]\d+[^.;]{0,90}"
+    r"(?:H\.?\s*R\.?|S\.?)\s*[-#:]?\s*\d{1,6}|"
+    r"(?:H\.?\s*R\.?|S\.?)\s*[-#:]?\s*\d{1,6}[^.;]{0,90}"
+    r"P(?:ublic|ub)?\.?\s*L(?:aw)?\.?\s*(\d{3})[-–]\d+)",
     re.I,
 )
 
@@ -147,7 +147,7 @@ def committee_activities(committee):
 def committee_evidence(committee):
     events = committee_activities(committee)
     names = [str(event.get("name", "")).strip() for event in events]
-    normalized = [re.sub(r"\\s+", " ", name).casefold() for name in names]
+    normalized = [re.sub(r"\s+", " ", name).casefold() for name in names]
     referral = any(name in {"referred to", "re-referred to", "committed to",
                             "re-committed to"} for name in normalized)
     substantive = any(name in {"hearings by", "hearing by", "markup by",
