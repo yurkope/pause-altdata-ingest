@@ -43,13 +43,39 @@ def title_evidence(window, title):
 
 
 PUBLIC_LAW_PATTERN = re.compile(r"\\bP(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–](\\d+)\\b", re.I)
+PUBLIC_LAW_LINK_PATTERN = re.compile(
+    r"(?:P(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–]\\d+[^.;]{0,90}"
+    r"(?:H\\.?\\s*R\\.?|S\\.?)\\s*[-#:]?\\s*\\d{1,6}|"
+    r"(?:H\\.?\\s*R\\.?|S\\.?)\\s*[-#:]?\\s*\\d{1,6}[^.;]{0,90}"
+    r"P(?:ublic|ub)?\\.?\\s*L(?:aw)?\\.?\\s*(\\d{3})[-–]\\d+)",
+    re.I,
+)
 
 
-def mention_resolution(description, start, end, selected_congress, title=""):
+def linked_public_law_congresses(window, matched):
+    """Only use a public-law marker when it is locally tied to this bill token.
+
+    A ±220-char evidence window can discuss several laws. Treating any PL marker
+    in that window as evidence for every bill creates false conflicts.
+    """
+    target = re.sub(r"[^A-Z0-9]", "", matched.upper())
+    found = set()
+    for m in PUBLIC_LAW_LINK_PATTERN.finditer(window):
+        fragment = m.group(0)
+        tokens = {re.sub(r"[^A-Z0-9]", "", x.group(0).upper())
+                  for x in PATTERN.finditer(fragment)}
+        if target in tokens:
+            congress = m.group(1) or m.group(2)
+            if congress:
+                found.add(int(congress))
+    return found
+
+
+def mention_resolution(description, start, end, selected_congress, title="", matched=""):
     """Classify Congress context locally; title evidence may strengthen candidates."""
     window = mention_window(description, start, end)
     explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
-    public_law_congresses = {int(m.group(1)) for m in PUBLIC_LAW_PATTERN.finditer(window)}
+    public_law_congresses = linked_public_law_congresses(window, matched) if matched else set()
     congress_evidence = explicit | public_law_congresses
     if selected_congress in congress_evidence and len(congress_evidence) == 1:
         method = "explicit_congress_local" if selected_congress in explicit else "public_law_congress_local"
@@ -236,8 +262,8 @@ def main():
                     print("  WARNING: broad multi-committee association; only substantive committees are pressure-eligible")
                 if any(not e["committee_code"] for e in evidence_rows):
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
-                statuses = Counter(mention_resolution(desc, start, end, args.congress, title)[0]
-                                   for _, _, desc, start, end in evidence[(typ, number)])
+                statuses = Counter(mention_resolution(desc, start, end, args.congress, title, matched)[0]
+                                   for _, matched, desc, start, end in evidence[(typ, number)])
                 resolved_bills += 1
                 mention_totals.update(statuses)
                 print(f"  mention_status={dict(statuses)}")
@@ -255,7 +281,7 @@ def main():
                     )
                     for activity_id, matched, description, start, end in evidence[(typ, number)]:
                         status, method, confidence, context = mention_resolution(
-                            description, start, end, args.congress, title
+                            description, start, end, args.congress, title, matched
                         )
                         cur.execute(
                             """INSERT INTO policy.bill_mention
