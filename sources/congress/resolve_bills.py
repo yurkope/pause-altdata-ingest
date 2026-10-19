@@ -78,13 +78,22 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
     # Explicit Congress prose is only safe when it is in the same local clause
     # as the target token. Long filing windows frequently mix historical and
     # current bills (e.g. "...118th Congress...; S. 2217 ...").
-    target_pos = window.find(matched) if matched else -1
-    if explicit and target_pos >= 0:
-        clause_start = max(window.rfind(";", 0, target_pos), window.rfind(".", 0, target_pos)) + 1
-        semi = window.find(";", target_pos)
-        dot = window.find(".", target_pos)
-        ends = [x for x in (semi, dot) if x >= 0]
-        clause_end = min(ends) if ends else len(window)
+    # Locate the exact target occurrence by normalized chamber/number, rather
+    # than window.find(matched): formatting can vary (H.R.1 vs H.R. 1).
+    target_key = re.sub(r"[^A-Z0-9]", "", matched.upper()) if matched else ""
+    target_match = next(
+        (m for m in PATTERN.finditer(window)
+         if re.sub(r"[^A-Z0-9]", "", m.group(0).upper()) == target_key),
+        None,
+    )
+    if explicit and target_match:
+        target_pos = target_match.start()
+        # Periods inside H.R./S. abbreviations are not clause boundaries.
+        # Semicolons are reliable separators in LDA issue descriptions; use a
+        # bounded local slice when no semicolon is present.
+        clause_start = window.rfind(";", 0, target_pos) + 1
+        semi = window.find(";", target_match.end())
+        clause_end = semi if semi >= 0 else min(len(window), target_match.end() + 140)
         clause = window[clause_start:clause_end]
         explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(clause)}
     public_law_congresses = linked_public_law_congresses(window, matched) if matched else set()
