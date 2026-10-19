@@ -75,6 +75,18 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
     """Classify Congress context locally; title evidence may strengthen candidates."""
     window = mention_window(description, start, end)
     explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
+    # Explicit Congress prose is only safe when it is in the same local clause
+    # as the target token. Long filing windows frequently mix historical and
+    # current bills (e.g. "...118th Congress...; S. 2217 ...").
+    target_pos = window.find(matched) if matched else -1
+    if explicit and target_pos >= 0:
+        clause_start = max(window.rfind(";", 0, target_pos), window.rfind(".", 0, target_pos)) + 1
+        semi = window.find(";", target_pos)
+        dot = window.find(".", target_pos)
+        ends = [x for x in (semi, dot) if x >= 0]
+        clause_end = min(ends) if ends else len(window)
+        clause = window[clause_start:clause_end]
+        explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(clause)}
     public_law_congresses = linked_public_law_congresses(window, matched) if matched else set()
     # A PL marker tied to this exact bill token is stronger than a broad
     # "119th Congress" phrase elsewhere in the ±220-char context.
