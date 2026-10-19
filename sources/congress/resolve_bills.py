@@ -76,13 +76,19 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
     window = mention_window(description, start, end)
     explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
     public_law_congresses = linked_public_law_congresses(window, matched) if matched else set()
-    congress_evidence = explicit | public_law_congresses
-    if selected_congress in congress_evidence and len(congress_evidence) == 1:
-        method = "explicit_congress_local" if selected_congress in explicit else "public_law_congress_local"
-        return "verified", method, 1.0, window
-    if congress_evidence and selected_congress not in congress_evidence:
+    # A PL marker tied to this exact bill token is stronger than a broad
+    # "119th Congress" phrase elsewhere in the ±220-char context.
+    if public_law_congresses:
+        if public_law_congresses == {selected_congress}:
+            return "verified", "public_law_congress_local", 1.0, window
+        if selected_congress not in public_law_congresses and len(public_law_congresses) == 1:
+            return "rejected", "conflicting_public_law_local", 1.0, window
+        return "ambiguous", "multiple_public_law_local", 0.5, window
+    if explicit == {selected_congress}:
+        return "verified", "explicit_congress_local", 1.0, window
+    if explicit and selected_congress not in explicit:
         return "rejected", "conflicting_congress_local", 1.0, window
-    if len(congress_evidence) > 1:
+    if len(explicit) > 1:
         return "ambiguous", "multiple_congress_local", 0.5, window
     overlap = title_evidence(window, title)
     if overlap >= 0.80:
