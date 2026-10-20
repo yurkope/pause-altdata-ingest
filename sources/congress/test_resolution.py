@@ -118,6 +118,34 @@ class MentionResolutionTests(unittest.TestCase):
         self.assertEqual(status, "candidate")
         self.assertNotEqual(method, "conflicting_congress_local")
 
+    def test_live_hr2592_neighbor_prior_law_stays_candidate(self):
+        status, method, _ = resolve(
+            "H.R. 2592, Aviation Medication Transparency Act of 2025, all provisions. P.L. 118-63, FAA Reauthorization Act of 2024, most provisions.",
+            "Aviation Medication Transparency Act of 2025", target="H.R.2592",
+        )
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
+    def test_live_hr5376_historical_collision_rejects(self):
+        self.assertEqual(resolve(
+            "Implementation of drug pricing provisions related to H.R. 5376 (P.L. 117-169), The Inflation Reduction Act.",
+            "Impacts and Outcomes for Health Career Training Act", target="H.R.5376",
+        )[0], "rejected")
+
+    def test_live_hr2882_historical_collision_rejects(self):
+        self.assertEqual(resolve(
+            "FY 2024 Further Consolidated Appropriations Act, H.R. 2882, now enacted as Public Law 118-47.",
+            "Central Coast of California Conservation Act of 2025", target="H.R.2882",
+        )[0], "rejected")
+
+    def test_paired_historical_bill_without_direct_marker_stays_candidate(self):
+        status, method, _ = resolve(
+            "Implementation of FAA Reauthorization Act of 2024 (S.1939, H.R.3935, P.L. 118-63).",
+            "BARK Act of 2025", target="S.1939",
+        )
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
     def test_nearest_bill_gets_public_law(self):
         status, method, _ = resolve("H.R.4552/S.2465, FY26 THUD; H.R.1, One Big Beautiful Bill Act (P.L.119-21)",
                                     "Transportation, Housing and Urban Development, and Related Agencies Appropriations Act, 2026")
