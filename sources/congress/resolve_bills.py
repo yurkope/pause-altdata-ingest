@@ -76,6 +76,33 @@ def linked_public_law_congresses(window, matched):
     return found
 
 
+def linked_explicit_congresses(window, matched):
+    """Link an explicit 'Nth Congress' marker to the nearest bill token."""
+    target = re.sub(r"[^A-Z0-9]", "", matched.upper())
+    bills = list(PATTERN.finditer(window))
+    found = set()
+    for marker in CONGRESS_PATTERN.finditer(window):
+        candidates = []
+        for bill in bills:
+            gap = max(marker.start() - bill.end(), bill.start() - marker.end(), 0)
+            if gap > 100:
+                continue
+            between = window[min(marker.end(), bill.end()):max(marker.start(), bill.start())]
+            if ";" in between:
+                continue
+            candidates.append((gap, bill))
+        if not candidates:
+            continue
+        min_gap = min(gap for gap, _ in candidates)
+        nearest = [bill for gap, bill in candidates if gap == min_gap]
+        if len(nearest) != 1:
+            continue
+        key = re.sub(r"[^A-Z0-9]", "", nearest[0].group(0).upper())
+        if key == target:
+            found.add(int(marker.group(1)))
+    return found
+
+
 def authoritative_law_congresses(source_json):
     """Congress numbers from Congress.gov's bill-specific laws relationship."""
     laws = (source_json or {}).get("laws") or []
@@ -90,28 +117,7 @@ def authoritative_law_congresses(source_json):
 def mention_resolution(description, start, end, selected_congress, title="", matched="", source_json=None):
     """Classify Congress context locally; title evidence may strengthen candidates."""
     window = mention_window(description, start, end)
-    explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
-    # Explicit Congress prose is only safe when it is in the same local clause
-    # as the target token. Long filing windows frequently mix historical and
-    # current bills (e.g. "...118th Congress...; S. 2217 ...").
-    # Locate the exact target occurrence by normalized chamber/number, rather
-    # than window.find(matched): formatting can vary (H.R.1 vs H.R. 1).
-    target_key = re.sub(r"[^A-Z0-9]", "", matched.upper()) if matched else ""
-    target_match = next(
-        (m for m in PATTERN.finditer(window)
-         if re.sub(r"[^A-Z0-9]", "", m.group(0).upper()) == target_key),
-        None,
-    )
-    if explicit and target_match:
-        target_pos = target_match.start()
-        # Periods inside H.R./S. abbreviations are not clause boundaries.
-        # Semicolons are reliable separators in LDA issue descriptions; use a
-        # bounded local slice when no semicolon is present.
-        clause_start = window.rfind(";", 0, target_pos) + 1
-        semi = window.find(";", target_match.end())
-        clause_end = semi if semi >= 0 else min(len(window), target_match.end() + 140)
-        clause = window[clause_start:clause_end]
-        explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(clause)}
+    explicit = linked_explicit_congresses(window, matched) if matched else set()
     public_law_congresses = linked_public_law_congresses(window, matched) if matched else set()
     authoritative = authoritative_law_congresses(source_json)
     # Congress.gov's bill-specific laws relation is an independent guardrail:
@@ -139,14 +145,10 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
         else:
             return "ambiguous", "multiple_public_law_local", 0.5, window
     if explicit == {selected_congress}:
-        if overlap >= 0.55:
-            return "verified", "explicit_congress_local", 1.0, window
-        explicit = set()
-    elif explicit and selected_congress not in explicit:
-        if overlap < 0.55:
-            return "rejected", "conflicting_congress_local", 1.0, window
-        explicit = set()
-    elif len(explicit) > 1:
+        return "verified", "explicit_congress_local", 1.0, window
+    if explicit and selected_congress not in explicit:
+        return "rejected", "conflicting_congress_local", 1.0, window
+    if len(explicit) > 1:
         return "ambiguous", "multiple_congress_local", 0.5, window
     if overlap >= 0.80:
         return "candidate", "title_strong_local", 0.85, window
