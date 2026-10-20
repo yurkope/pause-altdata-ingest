@@ -119,21 +119,32 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
     # enacted-law Congress, do not promote the mention from text proximity.
     if public_law_congresses and authoritative and not public_law_congresses.issubset(authoritative):
         public_law_congresses = set()
-    # A PL marker tied to this exact bill token is stronger than a broad
-    # "119th Congress" phrase elsewhere in the ±220-char context.
+    overlap = title_evidence(window, title)
+    # Direct markers must agree with the selected bill's title before they can
+    # create a hard decision, unless Congress.gov itself confirms the enacted
+    # law. This prevents a nearby law for another bill from causing a false
+    # verify/reject while still catching historical same-number collisions.
     if public_law_congresses:
         if public_law_congresses == {selected_congress}:
-            return "verified", "public_law_congress_local", 1.0, window
-        if selected_congress not in public_law_congresses and len(public_law_congresses) == 1:
-            return "rejected", "conflicting_public_law_local", 1.0, window
-        return "ambiguous", "multiple_public_law_local", 0.5, window
+            if selected_congress in authoritative or overlap >= 0.55:
+                return "verified", "public_law_congress_local", 1.0, window
+            public_law_congresses = set()
+        elif selected_congress not in public_law_congresses and len(public_law_congresses) == 1:
+            if overlap < 0.55:
+                return "rejected", "conflicting_public_law_local", 1.0, window
+            public_law_congresses = set()
+        else:
+            return "ambiguous", "multiple_public_law_local", 0.5, window
     if explicit == {selected_congress}:
-        return "verified", "explicit_congress_local", 1.0, window
-    if explicit and selected_congress not in explicit:
-        return "rejected", "conflicting_congress_local", 1.0, window
-    if len(explicit) > 1:
+        if overlap >= 0.55:
+            return "verified", "explicit_congress_local", 1.0, window
+        explicit = set()
+    elif explicit and selected_congress not in explicit:
+        if overlap < 0.55:
+            return "rejected", "conflicting_congress_local", 1.0, window
+        explicit = set()
+    elif len(explicit) > 1:
         return "ambiguous", "multiple_congress_local", 0.5, window
-    overlap = title_evidence(window, title)
     if overlap >= 0.80:
         return "candidate", "title_strong_local", 0.85, window
     if overlap >= 0.55:
