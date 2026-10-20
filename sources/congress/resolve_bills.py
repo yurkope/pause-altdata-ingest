@@ -81,7 +81,7 @@ def authoritative_law_congresses(source_json):
     laws = (source_json or {}).get("laws") or []
     found = set()
     for law in laws:
-        m = re.match(r"^(\\d{3})-", str(law.get("number") or ""))
+        m = re.match(r"^(\d{3})-", str(law.get("number") or ""))
         if m:
             found.add(int(m.group(1)))
     return found
