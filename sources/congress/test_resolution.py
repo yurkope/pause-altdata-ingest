@@ -76,6 +76,27 @@ class MentionResolutionTests(unittest.TestCase):
         self.assertEqual(status, "candidate")
         self.assertNotEqual(method, "conflicting_public_law_local")
 
+    def test_current_title_overrides_unrelated_prior_law(self):
+        status, method, _ = resolve(
+            "Public Law 117-58 Infrastructure Investment and Jobs Act, transit funding H.R.4552, Transportation, Housing and Urban Development, and Related Agencies Appropriations Act, FY2026",
+            "Transportation, Housing and Urban Development, and Related Agencies Appropriations Act, 2026",
+        )
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
+    def test_current_title_blocks_false_current_law_verification(self):
+        status, method, _ = resolve(
+            "Public Law 119-4 Full-Year Continuing Appropriations Act, H.R.5342, Commerce, Justice, Science, and Related Agencies Appropriations Act, FY2026",
+            "Commerce, Justice, Science, and Related Agencies Appropriations Act, 2026",
+        )
+        self.assertNotEqual(method, "public_law_congress_local")
+
+    def test_historical_same_number_low_title_overlap_still_rejects(self):
+        self.assertEqual(resolve(
+            "S.1939, H.R.3935, FAA Reauthorization Act of 2024 (P.L.118-63)",
+            "BARK Act of 2025",
+        )[0], "rejected")
+
     def test_nearest_bill_gets_public_law(self):
         status, method, _ = resolve("H.R.4552/S.2465, FY26 THUD; H.R.1, One Big Beautiful Bill Act (P.L.119-21)",
                                     "Transportation, Housing and Urban Development, and Related Agencies Appropriations Act, 2026")
