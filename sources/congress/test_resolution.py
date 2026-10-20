@@ -4,13 +4,18 @@ Run from repository root:
     python -m unittest sources.congress.test_resolution
 """
 import unittest
+import re
 from sources.congress.resolve_bills import PATTERN, authoritative_law_congresses, mention_resolution
 
 
-def resolve(text, title, congress=119, source_json=None):
-    m = PATTERN.search(text)
-    if not m:
-        raise AssertionError("fixture has no bill token")
+def resolve(text, title, congress=119, source_json=None, target=None):
+    matches = list(PATTERN.finditer(text))
+    if target:
+        key = re.sub(r"[^A-Z0-9]", "", target.upper())
+        matches = [m for m in matches if re.sub(r"[^A-Z0-9]", "", m.group(0).upper()) == key]
+    if not matches:
+        raise AssertionError("fixture has no matching bill token")
+    m = matches[0]
     return mention_resolution(text, m.start(), m.end(), congress, title, m.group(0), source_json)[:3]
 
 
@@ -51,7 +56,7 @@ class MentionResolutionTests(unittest.TestCase):
 
     def test_historical_congress_in_prior_clause_does_not_reject(self):
         status, method, _ = resolve("H.R. 7665 in the 118th Congress; S. 717, Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025",
-                                    "Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025")
+                                    "Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025", target="S.717")
         self.assertEqual(status, "candidate")
         self.assertIn(method, {"title_strong_local", "title_moderate_local"})
 
@@ -72,7 +77,7 @@ class MentionResolutionTests(unittest.TestCase):
 
     def test_public_law_belongs_to_previous_bill(self):
         status, method, _ = resolve("H.R.133, Consolidated Appropriations Act, 2021 (P.L.116-260); S.2420/H.R.4710, No Surprises Act Enforcement Act",
-                                    "No Surprises Act Enforcement Act")
+                                    "No Surprises Act Enforcement Act", target="H.R.4710")
         self.assertEqual(status, "candidate")
         self.assertNotEqual(method, "conflicting_public_law_local")
 
@@ -108,7 +113,7 @@ class MentionResolutionTests(unittest.TestCase):
     def test_explicit_prior_congress_on_neighbor_does_not_reject(self):
         status, method, _ = resolve(
             "H.R.7665 in the 118th Congress; S.717, Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025",
-            "Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025",
+            "Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025", target="S.717",
         )
         self.assertEqual(status, "candidate")
         self.assertNotEqual(method, "conflicting_congress_local")
