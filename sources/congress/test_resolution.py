@@ -43,6 +43,23 @@ class MentionResolutionTests(unittest.TestCase):
         self.assertEqual(resolve("H.R.1 - 119th Congress (2025-2026) reconciliation", "An act to provide for reconciliation pursuant to title II of H. Con. Res. 14.")[:2],
                          ("verified", "explicit_congress_local"))
 
+    def test_same_number_historical_public_law_rejects(self):
+        self.assertEqual(resolve("H.R.4366 - Consolidated Appropriations Act, 2024 (P.L. 118-42).",
+                                 "Save Local Business Act")[:2],
+                         ("rejected", "conflicting_public_law_local"))
+
+    def test_unrelated_prior_law_before_current_bill_does_not_reject(self):
+        status, method, _ = resolve("Inflation Reduction Act (P.L.117-169) implementation; H.R.1 One Big Beautiful Bill Act",
+                                    "An act to provide for reconciliation pursuant to title II of H. Con. Res. 14.")
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
+    def test_public_law_belongs_to_previous_bill(self):
+        status, method, _ = resolve("H.R.133, Consolidated Appropriations Act, 2021 (P.L.116-260); S.2420/H.R.4710, No Surprises Act Enforcement Act",
+                                    "No Surprises Act Enforcement Act")
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
     def test_nearest_bill_gets_public_law(self):
         status, method, _ = resolve("H.R.4552/S.2465, FY26 THUD; H.R.1, One Big Beautiful Bill Act (P.L.119-21)",
                                     "Transportation, Housing and Urban Development, and Related Agencies Appropriations Act, 2026")
