@@ -7,11 +7,11 @@ import unittest
 from sources.congress.resolve_bills import PATTERN, authoritative_law_congresses, mention_resolution
 
 
-def resolve(text, title, congress=119):
+def resolve(text, title, congress=119, source_json=None):
     m = PATTERN.search(text)
     if not m:
         raise AssertionError("fixture has no bill token")
-    return mention_resolution(text, m.start(), m.end(), congress, title, m.group(0))[:3]
+    return mention_resolution(text, m.start(), m.end(), congress, title, m.group(0), source_json)[:3]
 
 
 class MentionResolutionTests(unittest.TestCase):
@@ -32,11 +32,11 @@ class MentionResolutionTests(unittest.TestCase):
         self.assertNotEqual(method, "conflicting_public_law_local")
 
     def test_current_public_law_verifies(self):
-        self.assertEqual(resolve("H.R. 1968 (P.L.119-4), Full-Year Continuing Appropriations.", "Full-Year Continuing Appropriations and Extensions Act, 2025")[:2],
+        self.assertEqual(resolve("H.R. 1968 (P.L.119-4), Full-Year Continuing Appropriations.", "Full-Year Continuing Appropriations and Extensions Act, 2025", source_json={"laws": [{"number": "119-4"}]})[:2],
                          ("verified", "public_law_congress_local"))
 
     def test_hr1_current_public_law_verifies(self):
-        self.assertEqual(resolve("P.L. 119-21 (H.R. 1): One Big Beautiful Bill implementation", "An act to provide for reconciliation pursuant to title II of H. Con. Res. 14.")[:2],
+        self.assertEqual(resolve("P.L. 119-21 (H.R. 1): One Big Beautiful Bill implementation", "An act to provide for reconciliation pursuant to title II of H. Con. Res. 14.", source_json={"laws": [{"number": "119-21"}]})[:2],
                          ("verified", "public_law_congress_local"))
 
     def test_prior_public_law_rejects(self):
