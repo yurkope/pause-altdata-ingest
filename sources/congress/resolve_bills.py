@@ -311,7 +311,7 @@ def main():
                     print("  WARNING: broad multi-committee association; only substantive committees are pressure-eligible")
                 if any(not e["committee_code"] for e in evidence_rows):
                     print("  WARNING: missing committee systemCode; cannot persist those relationships")
-                statuses = Counter(mention_resolution(desc, start, end, args.congress, title, matched)[0]
+                statuses = Counter(mention_resolution(desc, start, end, args.congress, title, matched, bill)[0]
                                    for _, matched, desc, start, end in evidence[(typ, number)])
                 resolved_bills += 1
                 mention_totals.update(statuses)
@@ -330,7 +330,7 @@ def main():
                     )
                     for activity_id, matched, description, start, end in evidence[(typ, number)]:
                         status, method, confidence, context = mention_resolution(
-                            description, start, end, args.congress, title, matched
+                            description, start, end, args.congress, title, matched, bill
                         )
                         cur.execute(
                             """INSERT INTO policy.bill_mention
