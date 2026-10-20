@@ -43,31 +43,36 @@ def title_evidence(window, title):
 
 
 PUBLIC_LAW_PATTERN = re.compile(r"\bP(?:ublic|ub)?\.?\s*L(?:aw)?\.?\s*(\d{3})[-–](\d+)\b", re.I)
-PUBLIC_LAW_LINK_PATTERN = re.compile(
-    r"(?:P(?:ublic|ub)?\.?\s*L(?:aw)?\.?\s*(\d{3})[-–]\d+[^.;]{0,90}"
-    r"(?:H\.?\s*R\.?|S\.?)\s*[-#:]?\s*\d{1,6}|"
-    r"(?:H\.?\s*R\.?|S\.?)\s*[-#:]?\s*\d{1,6}[^.;]{0,90}"
-    r"P(?:ublic|ub)?\.?\s*L(?:aw)?\.?\s*(\d{3})[-–]\d+)",
-    re.I,
-)
-
-
 def linked_public_law_congresses(window, matched):
-    """Only use a public-law marker when it is locally tied to this bill token.
+    """Link a public-law Congress only to the nearest bill token.
 
-    A ±220-char evidence window can discuss several laws. Treating any PL marker
-    in that window as evidence for every bill creates false conflicts.
+    LDA descriptions often list several bills and public laws in one evidence
+    window. A PL marker is bill-specific only when the target bill is the
+    nearest bill token within 90 characters and no semicolon separates them.
     """
     target = re.sub(r"[^A-Z0-9]", "", matched.upper())
+    bills = list(PATTERN.finditer(window))
     found = set()
-    for m in PUBLIC_LAW_LINK_PATTERN.finditer(window):
-        fragment = m.group(0)
-        tokens = {re.sub(r"[^A-Z0-9]", "", x.group(0).upper())
-                  for x in PATTERN.finditer(fragment)}
-        if target in tokens:
-            congress = m.group(1) or m.group(2)
-            if congress:
-                found.add(int(congress))
+    for pl in PUBLIC_LAW_PATTERN.finditer(window):
+        congress = int(pl.group(1))
+        candidates = []
+        for bill in bills:
+            gap = max(pl.start() - bill.end(), bill.start() - pl.end(), 0)
+            if gap > 90:
+                continue
+            between = window[min(pl.end(), bill.end()):max(pl.start(), bill.start())]
+            if ";" in between:
+                continue
+            candidates.append((gap, bill))
+        if not candidates:
+            continue
+        min_gap = min(gap for gap, _ in candidates)
+        nearest = [bill for gap, bill in candidates if gap == min_gap]
+        if len(nearest) != 1:
+            continue
+        key = re.sub(r"[^A-Z0-9]", "", nearest[0].group(0).upper())
+        if key == target:
+            found.add(congress)
     return found
 
 
