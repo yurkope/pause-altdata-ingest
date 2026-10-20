@@ -126,7 +126,10 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
     # verify/reject while still catching historical same-number collisions.
     if public_law_congresses:
         if public_law_congresses == {selected_congress}:
-            if selected_congress in authoritative or overlap >= 0.55:
+            # "Verified" requires Congress.gov to confirm that this exact bill
+            # became the cited public law. A current-Congress PL next to a
+            # different bill is useful context but is not bill identity proof.
+            if selected_congress in authoritative:
                 return "verified", "public_law_congress_local", 1.0, window
             public_law_congresses = set()
         elif selected_congress not in public_law_congresses and len(public_law_congresses) == 1:
