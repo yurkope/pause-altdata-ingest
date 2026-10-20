@@ -4,7 +4,7 @@ Run from repository root:
     python -m unittest sources.congress.test_resolution
 """
 import unittest
-from sources.congress.resolve_bills import PATTERN, mention_resolution
+from sources.congress.resolve_bills import PATTERN, authoritative_law_congresses, mention_resolution
 
 
 def resolve(text, title, congress=119):
@@ -15,6 +15,22 @@ def resolve(text, title, congress=119):
 
 
 class MentionResolutionTests(unittest.TestCase):
+    def test_authoritative_law_congress_parser(self):
+        self.assertEqual(authoritative_law_congresses({"laws": [{"type": "Public Law", "number": "119-21"}]}), {119})
+        self.assertEqual(authoritative_law_congresses({"laws": [{"type": "Public Law", "number": "118-63"}]}), {118})
+
+    def test_authoritative_law_blocks_conflicting_proximity(self):
+        text = "H.R. 1, One Big Beautiful Bill Act (P.L.118-63)"
+        m = PATTERN.search(text)
+        status, method, _ = mention_resolution(
+            text, m.start(), m.end(), 119,
+            "An act to provide for reconciliation pursuant to title II of H. Con. Res. 14.",
+            m.group(0),
+            {"laws": [{"type": "Public Law", "number": "119-21"}]},
+        )[:3]
+        self.assertNotEqual(status, "rejected")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
     def test_current_public_law_verifies(self):
         self.assertEqual(resolve("H.R. 1968 (P.L.119-4), Full-Year Continuing Appropriations.", "Full-Year Continuing Appropriations and Extensions Act, 2025")[:2],
                          ("verified", "public_law_congress_local"))
