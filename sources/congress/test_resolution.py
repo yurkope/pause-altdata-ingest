@@ -40,7 +40,7 @@ class MentionResolutionTests(unittest.TestCase):
                          ("verified", "public_law_congress_local"))
 
     def test_prior_public_law_rejects(self):
-        self.assertEqual(resolve("H.R. 3935, FAA Reauthorization Act of 2024 (P.L.118-63)", "FAA Reauthorization Act of 2024")[:2],
+        self.assertEqual(resolve("H.R. 3935, FAA Reauthorization Act of 2024 (P.L.118-63)", "Reducing Permitting Uncertainty Act")[:2],
                          ("rejected", "conflicting_public_law_local"))
 
     def test_unrelated_prior_law_does_not_reject_current_bill(self):
@@ -91,11 +91,27 @@ class MentionResolutionTests(unittest.TestCase):
         )
         self.assertNotEqual(method, "public_law_congress_local")
 
-    def test_historical_same_number_low_title_overlap_still_rejects(self):
-        self.assertEqual(resolve(
+    def test_historical_marker_attaches_to_nearest_bill_only(self):
+        status, method, _ = resolve(
             "S.1939, H.R.3935, FAA Reauthorization Act of 2024 (P.L.118-63)",
             "BARK Act of 2025",
+        )
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_public_law_local")
+
+    def test_direct_historical_same_number_rejects(self):
+        self.assertEqual(resolve(
+            "S.1939, FAA Reauthorization Act of 2024 (P.L.118-63)",
+            "BARK Act of 2025",
         )[0], "rejected")
+
+    def test_explicit_prior_congress_on_neighbor_does_not_reject(self):
+        status, method, _ = resolve(
+            "H.R.7665 in the 118th Congress; S.717, Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025",
+            "Increasing Access to Quality Cardiac Rehabilitation Care Act of 2025",
+        )
+        self.assertEqual(status, "candidate")
+        self.assertNotEqual(method, "conflicting_congress_local")
 
     def test_nearest_bill_gets_public_law(self):
         status, method, _ = resolve("H.R.4552/S.2465, FY26 THUD; H.R.1, One Big Beautiful Bill Act (P.L.119-21)",
