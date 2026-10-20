@@ -76,7 +76,18 @@ def linked_public_law_congresses(window, matched):
     return found
 
 
-def mention_resolution(description, start, end, selected_congress, title="", matched=""):
+def authoritative_law_congresses(source_json):
+    """Congress numbers from Congress.gov's bill-specific laws relationship."""
+    laws = (source_json or {}).get("laws") or []
+    found = set()
+    for law in laws:
+        m = re.match(r"^(\\d{3})-", str(law.get("number") or ""))
+        if m:
+            found.add(int(m.group(1)))
+    return found
+
+
+def mention_resolution(description, start, end, selected_congress, title="", matched="", source_json=None):
     """Classify Congress context locally; title evidence may strengthen candidates."""
     window = mention_window(description, start, end)
     explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(window)}
@@ -102,6 +113,12 @@ def mention_resolution(description, start, end, selected_congress, title="", mat
         clause = window[clause_start:clause_end]
         explicit = {int(m.group(1)) for m in CONGRESS_PATTERN.finditer(clause)}
     public_law_congresses = linked_public_law_congresses(window, matched) if matched else set()
+    authoritative = authoritative_law_congresses(source_json)
+    # Congress.gov's bill-specific laws relation is an independent guardrail:
+    # if local text claims a PL for this bill but Congress.gov has a different
+    # enacted-law Congress, do not promote the mention from text proximity.
+    if public_law_congresses and authoritative and not public_law_congresses.issubset(authoritative):
+        public_law_congresses = set()
     # A PL marker tied to this exact bill token is stronger than a broad
     # "119th Congress" phrase elsewhere in the ±220-char context.
     if public_law_congresses:
