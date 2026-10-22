@@ -7,16 +7,32 @@ WITH params AS (SELECT 2025::int filing_year,.850::numeric min_confidence),
 bill_map AS (
  SELECT congress,bill_type,bill_number,title,
  CASE
+  -- Explicit anchors for acronym-only bills whose titles are not semantically self-describing.
+  WHEN congress=119 AND bill_type='HR' AND bill_number=4776 THEN 'PERMITTING_ENV_REVIEW' -- SPEED Act
+  WHEN congress=119 AND bill_type='HR' AND bill_number=2392 THEN 'DIGITAL_ASSETS' -- STABLE Act
+  WHEN congress=119 AND bill_type='HR' AND bill_number=1566 THEN 'AUTO_REPAIR_RIGHT_TO_REPAIR' -- REPAIR Act
+  WHEN congress=119 AND bill_type='S' AND bill_number=1379 THEN 'AUTO_REPAIR_RIGHT_TO_REPAIR' -- REPAIR Act
   WHEN title ~* '(permit|NEPA|environmental review|deployment review|regulatory clarity)' THEN 'PERMITTING_ENV_REVIEW'
   WHEN title ~* '(forest|wildfire|sequoia)' THEN 'FORESTS_WILDFIRE'
-  WHEN title ~* '(kids online|online privacy|children and teens|parents over platforms|COPPA)' THEN 'ONLINE_SAFETY_PRIVACY'
+  WHEN title ~* '(kids online|online privacy|children and teens|parents over platforms|COPPA|TAKE IT DOWN|App Store Accountability|NO FAKES)' THEN 'ONLINE_SAFETY_PRIVACY'
   WHEN title ~* '(artificial intelligence|(^|[^A-Za-z])AI([^A-Za-z]|$))' THEN 'AI_POLICY'
-  WHEN title ~* '(health care (cost|premium)|PBM|pharmacy benefit|copay)' THEN 'HEALTHCARE_COSTS_PBM'
+  WHEN title ~* '(health care (cost|premium|affordability)|PBM|pharmacy benefit|copay|Patients Deserve Price Tags)' THEN 'HEALTHCARE_COSTS_PBM'
+  WHEN title ~* '(Medicare|Seniors.*Access to Care|CONNECT for Health|Telehealth|Medically Unnecessary Delays|Safe Step|Dialysis Patients|Resident Physician Shortage|Maternal Deaths|Kids.*Access to Care)' THEN 'HEALTHCARE_ACCESS_DELIVERY'
+  WHEN title ~* '(Affordable Prescriptions|Affordable Generics|Biosimilars|pharmacist services)' THEN 'DRUG_ACCESS_COMPETITION'
   WHEN title ~* '(national defense authorization|NDAA)' THEN 'DEFENSE_AUTHORIZATION'
   WHEN title ~* 'department of defense appropriations' THEN 'DEFENSE_APPROPRIATIONS'
   WHEN title ~* '(appropriations act|continuing appropriations)' THEN 'APPROPRIATIONS_OTHER'
   WHEN title ~* '(digital asset|GENIUS Act|stablecoin|crypto)' THEN 'DIGITAL_ASSETS'
   WHEN title ~* '(FDA|orphan cures|give kids a chance|drug|pharmaceutical)' THEN 'DRUG_BIOMEDICAL_POLICY'
+  WHEN title ~* '(Main Street Tax|Death Tax|R&D Competitiveness|tax certainty)' THEN 'TAX_BUSINESS_INNOVATION'
+  WHEN title ~* '(Cybersecurity|cyber security|cyber)' THEN 'CYBERSECURITY'
+  WHEN title ~* '(Patent Eligibility|PREVAIL Act)' THEN 'IP_PATENT_POLICY'
+  WHEN title ~* '(Protecting the Right to Organize|Labor Contracts|Protect America.s Workforce|Save Local Business)' THEN 'LABOR_EMPLOYMENT'
+  WHEN title ~* '(GRID Power|Reliable Power|Energy Choice|Cross-border Energy Infrastructure|PIPES Act|PIPELINE Safety)' THEN 'ENERGY_GRID_INFRASTRUCTURE'
+  WHEN title ~* '(SHIPS for America|Coast Guard Authorization)' THEN 'MARITIME_SHIPPING'
+  WHEN title ~* 'Combating Organized Retail Crime' THEN 'RETAIL_CRIME'
+  WHEN title ~* '(PFAS|ESA Amendments)' THEN 'ENVIRONMENTAL_REGULATION'
+  WHEN title ~* '(recycling infrastructure|recycling technology)' THEN 'RECYCLING_CIRCULAR_ECONOMY'
   WHEN title ~* 'housing' THEN 'HOUSING'
   WHEN title ~* '(aviation|FAA)' THEN 'AVIATION'
   ELSE 'UNKNOWN_OTHER' END canonical_subissue,
