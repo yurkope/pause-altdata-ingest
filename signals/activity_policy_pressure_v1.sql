@@ -55,7 +55,7 @@ WITH base AS (
  ('BANK_CAPITAL', b.description ~* '(Basel III|bank capital|capital requirements)' AND b.general_issue_code IN('BAN','FIN')),
  ('RIGHT_TO_REPAIR', b.description ~* 'right to repair' AND b.general_issue_code IN('AUT','CSP','CPT','MAN','TRA')),
  ('RAIL_SAFETY', b.description ~* '(rail safety|railroad safety)' AND b.general_issue_code IN('RRR','TRA')),
- ('BUDGET_RECONCILIATION_OBBBA', b.description ~* '(One Big Beautiful Bill Act|H\\.R\\.? ?1)' AND b.general_issue_code IN('BUD','TAX','HCR','MMM','ENG','EDU','AGR','IMM','HOM','FIN')),
+ ('BUDGET_RECONCILIATION_OBBBA', b.description ~* '(One Big Beautiful Bill Act|H[.]R[.]? ?1)' AND b.general_issue_code IN('BUD','TAX','HCR','MMM','ENG','EDU','AGR','IMM','HOM','FIN')),
  ('INFRASTRUCTURE_IIJA', b.description ~* 'Infrastructure Investment and Jobs Act' AND b.general_issue_code IN('TRA','ENG','TEC','CAW','BUD','ECN','UTI','ROD','RRR')),
  ('CONTINUING_APPROPRIATIONS', b.description ~* '(Full-Year Continuing Appropriations and Extensions Act|Continuing Appropriations and Extensions Act)' AND b.general_issue_code IN('BUD','HCR','HOM','DEF','EDU','TRA','AGR')),
  ('HOMELAND_SECURITY_APPROPRIATIONS', b.description ~* 'Department of Homeland Security Appropriations Act' AND b.general_issue_code IN('BUD','HOM','IMM','DIS','AVI')),
@@ -71,7 +71,7 @@ WITH base AS (
  ('NASA_AUTHORIZATION', b.description ~* 'NASA Transition Authorization Act' AND b.general_issue_code IN('AER','SCI')),
  ('BUY_AMERICA', b.description ~* 'Buy America Act' AND b.general_issue_code IN('TRA','BUD','ENG','HOU','ROD','UTI')),
  ('ENDANGERED_SPECIES_ACT', b.description ~* 'Endangered Species Act' AND b.general_issue_code IN('ENV','NAT','ANI','MAR','CAW')),
- ('VOTING_RIGHTS', b.description ~* 'John R\\. Lewis Voting Rights Advancement Act' AND b.general_issue_code IN('CIV','CON','GOV'))
+ ('VOTING_RIGHTS', b.description ~* 'John R[.] Lewis Voting Rights Advancement Act' AND b.general_issue_code IN('CIV','CON','GOV'))
  ) v(label,is_match) WHERE is_match
 ), fl AS (SELECT DISTINCT filing_type,filing_uuid,client_id,label FROM labels),
 n AS (SELECT filing_type,filing_uuid,count(*)::numeric n FROM fl GROUP BY 1,2),
