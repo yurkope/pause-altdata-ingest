@@ -89,14 +89,26 @@ allocated AS (
  +.30*percent_rank()over(partition by filing_type order by clients)
  +.25*percent_rank()over(partition by filing_type order by activities)))::numeric,1) policy_pressure
  FROM raw
+), periodized AS (
+ SELECT *,substring(filing_type from 2 for 1)::int quarter_num FROM scored
 ), lagged AS (
- SELECT *,lag(policy_pressure)over(partition by label order by filing_type) prior_pressure,
- lag(clients)over(partition by label order by filing_type) prior_clients,
- lag(associated_amount)over(partition by label order by filing_type) prior_amount
- FROM scored
+ SELECT *,lag(quarter_num)over(partition by label order by quarter_num) prior_quarter_num,
+ lag(policy_pressure)over(partition by label order by quarter_num) lag_pressure,
+ lag(clients)over(partition by label order by quarter_num) lag_clients,
+ lag(associated_amount)over(partition by label order by quarter_num) lag_amount
+ FROM periodized
 )
 SELECT filing_type,label,filings,clients,activities,round(associated_amount,2) associated_amount,policy_pressure,
- prior_pressure,round((policy_pressure-prior_pressure)::numeric,1) pressure_change,
- prior_clients,(clients-prior_clients) client_change,
- CASE WHEN prior_amount>0 THEN round((100*(associated_amount-prior_amount)/prior_amount)::numeric,1) END associated_amount_qoq_pct
-FROM lagged ORDER BY filing_type DESC,policy_pressure DESC;
+ CASE WHEN prior_quarter_num=quarter_num-1 THEN lag_pressure END prior_pressure,
+ CASE WHEN prior_quarter_num=quarter_num-1 THEN round((policy_pressure-lag_pressure)::numeric,1) END pressure_change,
+ CASE WHEN prior_quarter_num=quarter_num-1 THEN lag_clients END prior_clients,
+ CASE WHEN prior_quarter_num=quarter_num-1 THEN clients-lag_clients END client_change,
+ CASE WHEN prior_quarter_num=quarter_num-1 AND lag_amount>0
+      THEN round((100*(associated_amount-lag_amount)/lag_amount)::numeric,1) END associated_amount_qoq_pct,
+ CASE
+   WHEN prior_quarter_num IS NULL OR prior_quarter_num<>quarter_num-1 THEN 'NEW_EMERGING'
+   WHEN policy_pressure-lag_pressure >= 5 THEN 'ACCELERATING'
+   WHEN policy_pressure-lag_pressure <= -5 THEN 'COOLING'
+   ELSE 'PERSISTENT'
+ END signal_state
+FROM lagged ORDER BY quarter_num DESC,policy_pressure DESC;
