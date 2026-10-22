@@ -14,13 +14,18 @@ CREATE TABLE IF NOT EXISTS policy.activity_policy_evidence (
  policy_code text NOT NULL REFERENCES policy.canonical_policy(policy_code),
  evidence_method text NOT NULL CHECK (evidence_method IN ('bill_anchor','activity_regex','corpus_anchor','semantic')),
  confidence numeric(4,3) NOT NULL CHECK (confidence BETWEEN 0 AND 1),
+ evidence_key text NOT NULL,
  evidence_text text NOT NULL,
  classifier_version text NOT NULL,
  source_congress integer,
  source_bill_type text,
  source_bill_number integer,
  created_at timestamptz NOT NULL DEFAULT now(),
- PRIMARY KEY (activity_id,policy_code,evidence_method,classifier_version,evidence_text)
+ PRIMARY KEY (activity_id,policy_code,evidence_method,classifier_version,evidence_key),
+ CHECK (
+   (evidence_method = 'bill_anchor' AND source_congress IS NOT NULL AND source_bill_type IS NOT NULL AND source_bill_number IS NOT NULL)
+   OR evidence_method <> 'bill_anchor'
+ )
 );
 CREATE INDEX IF NOT EXISTS activity_policy_evidence_policy_idx ON policy.activity_policy_evidence(policy_code,confidence);
 CREATE INDEX IF NOT EXISTS activity_policy_evidence_activity_idx ON policy.activity_policy_evidence(activity_id);
