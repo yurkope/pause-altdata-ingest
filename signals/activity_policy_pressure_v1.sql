@@ -2,7 +2,7 @@
 -- Deterministic multi-label extraction. Filing amounts are divided across distinct
 -- matched subissues and are analytical allocations, not direct policy spending.
 WITH base AS (
- SELECT f.filing_type,f.filing_uuid,f.client_id,a.activity_id,a.description
+ SELECT f.filing_type,f.filing_uuid,f.client_id,a.activity_id,a.general_issue_code,a.description
  FROM lda.activity a JOIN lda.filing f USING(filing_uuid)
  WHERE f.filing_year=2025 AND f.filing_type IN('Q1','Q2','Q3','Q4')
 ), labels AS (
@@ -19,7 +19,23 @@ WITH base AS (
  ('DEFENSE_APPROPRIATIONS', b.description ~* '(defense appropriations|Department of Defense appropriations)'),
  ('ENERGY_WATER_APPROPRIATIONS', b.description ~* '(Energy and Water.*appropriation|Energy & Water.*appropriation)'),
  ('THUD_APPROPRIATIONS', b.description ~* '(Transportation.*HUD.*appropriation|THUD.*appropriation)'),
- ('EARMARKS_CPF_CDS', b.description ~* '(Community Project Funding|Congressionally Directed Spending)')
+ ('EARMARKS_CPF_CDS', b.description ~* '(Community Project Funding|Congressionally Directed Spending)'),
+ ('MEDICAID', b.description ~* 'Medicaid' AND b.general_issue_code IN('HCR','MMM','BUD','INS')),
+ ('CRITICAL_MINERALS_SUPPLY_CHAIN', b.description ~* '(critical mineral|critical material|rare earth|supply chain)' AND b.general_issue_code IN('TRD','MAN','DEF','ENG','NAT','SCI','ECN')),
+ ('AI_POLICY', b.description ~* '(artificial intelligence|AI regulation|AI policy|AI governance)' AND b.general_issue_code IN('SCI','CPI','TEC','COM','CSP','GOV','CPT','DEF')),
+ ('CLEAN_ENERGY_TAX_IRA', b.description ~* '(Inflation Reduction Act|clean energy tax credit|45Q|45V|45X|48E|45Y)' AND b.general_issue_code IN('TAX','ENG','ENV','MAN','TRA','TRD')),
+ ('CYBERSECURITY', b.description ~* '(cybersecurity|cyber security|CISA)' AND b.general_issue_code IN('HOM','CPI','SCI','TEC','DEF','GOV','BAN','FIN')),
+ ('FARM_BILL', b.description ~* 'Farm Bill' AND b.general_issue_code IN('AGR','FOO','BUD','NAT','TRD','WEL')),
+ ('PERMITTING_NEPA', b.description ~* '(NEPA|National Environmental Policy Act|permitting reform|permit reform)' AND b.general_issue_code IN('ENV','NAT','ENG','TRA','CAW','MAN','UTI','AGR')),
+ ('DATA_PRIVACY', b.description ~* '(data privacy|consumer privacy|privacy legislation|American Privacy Rights Act)' AND b.general_issue_code IN('CPI','TEC','COM','CSP','SCI','CPT','GOV')),
+ ('DIGITAL_ASSETS', b.description ~* '(digital asset|cryptocurrency|crypto|stablecoin)' AND b.general_issue_code IN('FIN','BAN','MON','CPI','SCI','TAX')),
+ ('WATER_INFRASTRUCTURE', b.description ~* '(water infrastructure|drinking water|wastewater)' AND b.general_issue_code IN('CAW','ENV','TRA','UTI','BUD','NAT')),
+ ('TELEHEALTH', b.description ~* '(telehealth|telemedicine)' AND b.general_issue_code IN('HCR','MMM','MED','TEC','INS','VET')),
+ ('FOREST_WILDFIRE', b.description ~* '(wildfire|forest management)' AND b.general_issue_code IN('NAT','ENV','AGR','BUD','DIS')),
+ ('SNAP_NUTRITION', b.description ~* '(SNAP|Supplemental Nutrition Assistance Program)' AND b.general_issue_code IN('AGR','FOO','WEL','BUD','HCR')),
+ ('PFAS', b.description ~* '(PFAS|per- and polyfluoroalkyl)' AND b.general_issue_code IN('ENV','CAW','CHM','DEF','NAT','WAS')),
+ ('CHIPS_SEMICONDUCTORS', b.description ~* '(CHIPS( and Science)? Act|semiconductor)' AND b.general_issue_code IN('MAN','SCI','CPI','TRD','DEF','TAX','ECN')),
+ ('FAA_AVIATION', b.description ~* '(FAA reauthorization|Federal Aviation Administration)' AND b.general_issue_code IN('AVI','TRA','AER','BUD'))
  ) v(label,is_match) WHERE is_match
 ), fl AS (SELECT DISTINCT filing_type,filing_uuid,client_id,label FROM labels),
 n AS (SELECT filing_type,filing_uuid,count(*)::numeric n FROM fl GROUP BY 1,2),
