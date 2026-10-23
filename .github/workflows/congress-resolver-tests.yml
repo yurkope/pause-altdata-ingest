@@ -1,0 +1,24 @@
+name: Congress resolver tests
+
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - 'sources/congress/**'
+      - 'requirements.txt'
+      - '.github/workflows/congress-resolver-tests.yml'
+  pull_request:
+    paths:
+      - 'sources/congress/**'
+      - 'requirements.txt'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt
+      - run: python -m unittest sources.congress.test_resolution
