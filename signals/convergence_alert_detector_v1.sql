@@ -80,9 +80,9 @@ SELECT c.*,
              WHEN c.structural_strength >= .75 THEN 'elevated structural convergence'
              WHEN c.structural_strength >= .70 THEN 'above-normal structural convergence' END,
         CASE WHEN c.policy_pressure_change >= 5
-             THEN format('policy pressure accelerating %+s',c.policy_pressure_change) END,
+             THEN format('policy pressure accelerating +%s',c.policy_pressure_change) END,
         CASE WHEN c.committee_pressure_change >= 5
-             THEN format('committee pressure accelerating %+s',c.committee_pressure_change) END,
+             THEN format('committee pressure accelerating +%s',c.committee_pressure_change) END,
         CASE WHEN c.committee_activity_share_pct >= 50
              THEN format('%s%% of committee strong activity linked to policy',c.committee_activity_share_pct)
              WHEN c.committee_activity_share_pct >= 15
