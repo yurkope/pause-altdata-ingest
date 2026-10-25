@@ -18,8 +18,16 @@ def choose(description,start,end,matched,bills):
     if len(viable)==1: return viable[0],"single_viable"
     if len(viable)>1:
         ranked=sorted(viable,key=lambda r:(r[3],r[5]),reverse=True); a,b=ranked[:2]
-        if a[3]>=.65 and a[3]-b[3]>=.20: return a,"title_confidence_margin"
-        if a[5]>=.55 and a[5]-b[5]>=.25: return a,"title_overlap_margin"
+        # Cross-Congress title assignment must be strong in absolute terms,
+        # not merely better than the other Congress.  The base resolver's
+        # .65 "moderate" title score is useful for candidate ranking but is
+        # not sufficient to choose identity across same-number collisions.
+        # Require >=80% distinctive-title overlap for the selected bill,
+        # >=35 percentage-point separation from the competing title, and the
+        # base resolver's strong-title confidence.  This deliberately favors
+        # false negatives over cross-Congress false positives.
+        if a[3]>=.85 and a[5]>=.80 and a[5]-b[5]>=.35:
+            return a,"strong_distinctive_title"
         return None,"same_number_ambiguous"
     return None,"all_rejected" if rows else "no_bill"
 
