@@ -1,6 +1,8 @@
 -- Hierarchy v3 permitting child classifier (audit/dry-run)
 -- Multi-label by design: one PERMITTING_NEPA activity may emit multiple child labels.
 -- These labels are evidence dimensions only. Do not sum filing dollars across child labels.
+-- Generic permitting-reform descriptions intentionally remain parent-only.
+-- Activities with 4+ child matches are valid omnibus records but should be flagged in downstream audits.
 
 WITH permitting AS (
     SELECT DISTINCT
@@ -39,5 +41,9 @@ matches AS (
     CROSS JOIN rules r
     WHERE p.description ~* r.pattern
 )
-SELECT * FROM matches
+SELECT
+    m.*,
+    count(*) OVER (PARTITION BY activity_id) AS activity_child_count,
+    (count(*) OVER (PARTITION BY activity_id) >= 4) AS omnibus_multilabel_flag
+FROM matches m
 ORDER BY activity_id, child_policy_code;
