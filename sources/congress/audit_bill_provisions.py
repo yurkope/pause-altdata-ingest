@@ -50,7 +50,7 @@ def normalize_ref(x):
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--congress",type=int,default=119)
-    ap.add_argument("--limit",type=int,default=0)
+    ap.add_argument("--limit",type=int,default=0)\n    ap.add_argument("--verbose",action="store_true",help="Print every candidate validation row")
     args=ap.parse_args()
     load_dotenv()
     key=os.environ["CONGRESS_API_KEY"]; db=os.environ["DATABASE_URL"]
@@ -92,8 +92,9 @@ def main():
         stats["checked"]+=1; stats["validated"]+=int(ok)
         if ok:
             validated_rows.append((activity_id,congress,btype,bnum,ref,vtype,vdate))
-        print({"activity_id":activity_id,"bill":f"{btype} {bnum}","section_ref":ref,
-               "validated":ok,"text_version":vtype,"text_date":vdate})
+        if args.verbose:
+            print({"activity_id":activity_id,"bill":f"{btype} {bnum}","section_ref":ref,
+                   "validated":ok,"text_version":vtype,"text_date":vdate})
     print("\\nBY_BILL")
     for bill,stats in sorted(by_bill.items(),key=lambda kv:(-kv[1]["checked"],kv[0])):
         stats["validation_rate"]=round(100*stats["validated"]/stats["checked"],1) if stats["checked"] else 0
