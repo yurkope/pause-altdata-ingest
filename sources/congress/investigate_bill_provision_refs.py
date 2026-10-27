@@ -80,7 +80,7 @@ def main():
       JOIN lda.filing f ON f.filing_uuid=a.filing_uuid
       WHERE bm.congress=%s AND bm.resolution_confidence>=.85
     ),w AS (
-      SELECT *,substring(description FROM greatest(1,bill_pos-80) FOR 520) local_text
+      SELECT *,substring(description FROM greatest(1,bill_pos-40) FOR 360) local_text
       FROM s WHERE bill_pos>0
     )
     SELECT activity_id,congress,bill_type,bill_number,resolution_confidence,
