@@ -81,7 +81,7 @@ def main():
                 cache[k]=(set(),None,None,None); missing_text+=1
             else:
                 r=s.get(url,timeout=(10,60)); r.raise_for_status()
-                txt=BeautifulSoup(r.text,"html.parser").get_text("\n")
+                txt=re.sub(r"<[^>]+>", "\\n", r.text)
                 sections={m.group(1).rstrip(".").lower() for m in SEC_RE.finditer(txt)}
                 cache[k]=(sections,url,vtype,vdate)
             time.sleep(.05)
