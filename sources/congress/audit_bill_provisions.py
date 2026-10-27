@@ -72,7 +72,7 @@ def main():
         with conn.cursor() as cur:
             cur.execute(q,(args.congress,)); rows=cur.fetchall()
     if args.limit: rows=rows[:args.limit]
-    s=session(); cache={}; checked=matched=missing_text=0
+    s=session(); cache={}; checked=matched=missing_text=0; by_bill={}; validated_rows=[]
     for activity_id,congress,btype,bnum,ref in rows:
         k=(congress,btype,bnum)
         if k not in cache:
@@ -88,9 +88,19 @@ def main():
         sections,url,vtype,vdate=cache[k]
         nr=normalize_ref(ref); ok=nr in sections if nr else False
         checked+=1; matched+=int(ok)
+        stats=by_bill.setdefault(f"{btype} {bnum}",{"checked":0,"validated":0})
+        stats["checked"]+=1; stats["validated"]+=int(ok)
+        if ok:
+            validated_rows.append((activity_id,congress,btype,bnum,ref,vtype,vdate))
         print({"activity_id":activity_id,"bill":f"{btype} {bnum}","section_ref":ref,
                "validated":ok,"text_version":vtype,"text_date":vdate})
+    print("\\nBY_BILL")
+    for bill,stats in sorted(by_bill.items(),key=lambda kv:(-kv[1]["checked"],kv[0])):
+        stats["validation_rate"]=round(100*stats["validated"]/stats["checked"],1) if stats["checked"] else 0
+        print({"bill":bill,**stats})
+    print("\\nSUMMARY")
     print({"candidates_checked":checked,"validated":matched,
+           "rejected":checked-matched,
            "validation_rate":round(100*matched/checked,1) if checked else 0,
            "bills_without_formatted_text":missing_text})
 
