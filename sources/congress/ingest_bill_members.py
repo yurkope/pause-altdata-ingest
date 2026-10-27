@@ -9,13 +9,32 @@ that any lobbyist or client contacted the member.
 import argparse,json,os,time
 import psycopg2,requests
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE="https://api.congress.gov/v3"
+
+def make_session():
+    retry=Retry(
+        total=8,
+        connect=8,
+        read=8,
+        status=8,
+        backoff_factor=1.0,
+        status_forcelist=(429,500,502,503,504),
+        allowed_methods=frozenset(["GET"]),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    s=requests.Session()
+    s.mount("https://",HTTPAdapter(max_retries=retry))
+    return s
 
 def api(s,key,path,params=None):
     p={"api_key":key,"format":"json","limit":250}
     if params: p.update(params)
-    r=s.get(BASE+path,params=p,timeout=30); r.raise_for_status()
+    r=s.get(BASE+path,params=p,timeout=(10,60))
+    r.raise_for_status()
     return r.json()
 
 def pages(s,key,path,keyname):
@@ -51,8 +70,9 @@ def main():
             AND e.classifier_version='permitting-child-v1'
           ORDER BY 2,3""",(args.congress,))
         bills=cur.fetchall()
-    s=requests.Session(); people={}; edges={}
-    for congress,typ,num in bills:
+    s=make_session(); people={}; edges={}
+    total=len(bills)
+    for i,(congress,typ,num) in enumerate(bills,1):
         slug=typ.lower()
         detail=api(s,key,f"/bill/{congress}/{slug}/{num}").get("bill",{})
         for x in detail.get("sponsors") or []:
@@ -65,6 +85,8 @@ def main():
             if not bid: continue
             people[bid]=(member_row(x),x)
             edges[(congress,typ,num,bid,"COSPONSOR")]=(x.get("sponsorshipDate"),bool(x.get("isWithdrawn")),x)
+        if i==1 or i%25==0 or i==total:
+            print(f"Fetched {i}/{total} bills; members={len(people)} edges={len(edges)}",flush=True)
         time.sleep(args.sleep)
     print({"bills":len(bills),"members":len(people),"bill_member_edges":len(edges),
            "sponsors":sum(k[4]=="SPONSOR" for k in edges),
