@@ -50,7 +50,8 @@ def normalize_ref(x):
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--congress",type=int,default=119)
-    ap.add_argument("--limit",type=int,default=0)\n    ap.add_argument("--verbose",action="store_true",help="Print every candidate validation row")
+    ap.add_argument("--limit",type=int,default=0)
+    ap.add_argument("--verbose",action="store_true",help="Print every candidate validation row")
     args=ap.parse_args()
     load_dotenv()
     key=os.environ["CONGRESS_API_KEY"]; db=os.environ["DATABASE_URL"]
