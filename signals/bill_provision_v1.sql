@@ -5,10 +5,17 @@
 --   Go one level below bill identity without forcing every bill mention into a
 --   provision. Exact/named provision evidence must be local to the bill mention.
 --
--- Evidence levels:
---   EXACT_SECTION_CANDIDATE  section/sec. reference found in a bounded bill-local window
---   ALL_PROVISIONS           LDA explicitly says all/entire provisions/titles/bill
---   BILL_ONLY_UNRESOLVED     strong bill mention but no safe local provision reference
+-- Evidence levels / investigation buckets:
+--   BILL_SECTION_CANDIDATE       section/sec. reference found in a bounded bill-local window;
+--                                requires official bill-text validation
+--   EXTERNAL_STATUTE_CANDIDATE   section reference appears with named statute/code language;
+--                                preserve as regulatory/statutory context, not bill provision
+--   ALL_PROVISIONS               LDA explicitly says all/entire provisions/titles/bill
+--   BILL_ONLY_UNRESOLVED         strong bill mention but no safe local provision reference
+--
+-- A failed bill-section validation is NEVER discarded. It remains an observation and
+-- should later be classified as external statute, neighboring bill, version mismatch,
+-- normalization/structure mismatch, named provision/topic, or unresolved.
 --
 -- IMPORTANT:
 --   EXACT_SECTION_CANDIDATE is a candidate until validated against the official
@@ -78,7 +85,10 @@ SELECT
     bill_number,
     resolution_confidence,
     CASE
-      WHEN local_section_ref IS NOT NULL THEN 'EXACT_SECTION_CANDIDATE'
+      WHEN local_section_ref IS NOT NULL
+       AND local_text ~* '\\m(clean air act|clean water act|internal revenue code|tax code|national environmental policy act|nepa|endangered species act|public law|u\\.s\\.c\\.|united states code)\\M'
+        THEN 'EXTERNAL_STATUTE_CANDIDATE'
+      WHEN local_section_ref IS NOT NULL THEN 'BILL_SECTION_CANDIDATE'
       WHEN explicit_all_provisions THEN 'ALL_PROVISIONS'
       ELSE 'BILL_ONLY_UNRESOLVED'
     END AS provision_evidence_level,
