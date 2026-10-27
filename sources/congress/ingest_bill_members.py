@@ -92,6 +92,16 @@ def main():
            "sponsors":sum(k[4]=="SPONSOR" for k in edges),
            "cosponsors":sum(k[4]=="COSPONSOR" for k in edges)})
     if not args.write: conn.close(); return
+
+    # The Congress.gov fetch can run long enough for Neon to close the idle
+    # connection used only to discover the bill universe. Reconnect immediately
+    # before the write transaction so API latency cannot stale the DB session.
+    try:
+        conn.close()
+    except Exception:
+        pass
+    conn=psycopg2.connect(db); conn.autocommit=False
+    print("Reconnected to database for write phase.",flush=True)
     with conn.cursor() as cur:
         for bid,(row,raw) in people.items():
             _,name,first,middle,last,suffix,party,state,district=row
