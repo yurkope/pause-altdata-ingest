@@ -11,7 +11,7 @@ import argparse, os, re, time
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from bs4 import BeautifulSoup
+from html.parser import HTMLParser
 from dotenv import load_dotenv
 import psycopg2
 
