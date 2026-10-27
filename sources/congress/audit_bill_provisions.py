@@ -7,7 +7,7 @@ and checks whether LDA bill-local section candidates actually exist in that bill
 
 This script does not write to Neon.
 """
-import argparse, os, re, time
+import argparse, csv, os, re, time
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--congress",type=int,default=119)
     ap.add_argument("--limit",type=int,default=0)
     ap.add_argument("--verbose",action="store_true",help="Print every candidate validation row")
+    ap.add_argument("--output",default="bill_provision_validated.csv",help="CSV path for validated section evidence")
     args=ap.parse_args()
     load_dotenv()
     key=os.environ["CONGRESS_API_KEY"]; db=os.environ["DATABASE_URL"]
@@ -96,6 +97,12 @@ def main():
         if args.verbose:
             print({"activity_id":activity_id,"bill":f"{btype} {bnum}","section_ref":ref,
                    "validated":ok,"text_version":vtype,"text_date":vdate})
+    with open(args.output,"w",newline="",encoding="utf-8") as fh:
+        w=csv.writer(fh)
+        w.writerow(["activity_id","congress","bill_type","bill_number","section_ref","text_version","text_date"])
+        w.writerows(validated_rows)
+    print({"validated_csv":args.output,"rows_written":len(validated_rows)})
+
     print("\\nBY_BILL")
     for bill,stats in sorted(by_bill.items(),key=lambda kv:(-kv[1]["checked"],kv[0])):
         stats["validation_rate"]=round(100*stats["validated"]/stats["checked"],1) if stats["checked"] else 0
