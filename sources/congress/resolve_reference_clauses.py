@@ -18,6 +18,36 @@ STATUTE_RE=re.compile(
  r"public law|p\.?l\.?|section 301 tariff|section 232)\b")
 CLAUSE_SPLIT_RE=re.compile(r"(?<=[.;])\s+|\s+(?:and|as well as)\s+(?=(?:H\.?R\.?|S\.?)\s*\d+\b)|(?<=:)\s+(?=(?:H\.?R\.?|S\.?)\s*\d+\b)",re.I)
 
+# Contextual authority aliases require both a section identifier and contextual
+# language. Section numbers alone are never sufficient to identify an authority.
+AUTHORITY_RULES=[
+ ("TRADE_ACT_301", {"301"}, re.compile(r"(?i)\b(USTR|trade representative|tariff|trade act|section 301 investigation)\b")),
+ ("CDA_230", {"230"}, re.compile(r"(?i)\b(content moderation|communications decency|online platform|interactive computer service|social media)\b")),
+ ("SMALL_BUSINESS_DATA_1071", {"1071"}, re.compile(r"(?i)\b(CFPB|small business data|data reporting|business lending|ECOA|equal credit opportunity)\b")),
+ ("IRC_174", {"174"}, re.compile(r"(?i)\b(R&D|research|experimental|expensing|deductibility|tax)\b")),
+ ("IRC_179", {"179"}, re.compile(r"(?i)\b(expensing|deduction|tax cuts|tax code|business equipment)\b")),
+ ("IRC_199A", {"199a"}, re.compile(r"(?i)\b(pass[- ]through|qualified business|main street tax|deduction|tax)\b")),
+ ("IRC_30D", {"30d"}, re.compile(r"(?i)\b(clean vehicle|vehicle credit|treasury|IRS)\b")),
+ ("IRC_45V", {"45v"}, re.compile(r"(?i)\b(hydrogen|clean hydrogen|tax credit|treasury|IRS)\b")),
+ ("IRC_45Z", {"45z"}, re.compile(r"(?i)\b(clean fuel|fuel production|tax credit|treasury|IRS)\b")),
+ ("IRC_163J", {"163(j)"}, re.compile(r"(?i)\b(interest|business interest|deduction|tax|IRC|code)\b")),
+ ("IRC_401H", {"401(h)"}, re.compile(r"(?i)\b(VEBA|retiree|medical|pension|surplus|tax)\b")),
+ ("IRC_3504", {"3504"}, re.compile(r"(?i)\b(PEO|employment tax|payroll|IRS|code)\b")),
+ ("TARIFF_ACT_337", {"337"}, re.compile(r"(?i)\b(ITC|international trade commission|importation|patent|infring)\w*\b")),
+ ("TSCA_5", {"5"}, re.compile(r"(?i)\b(TSCA|toxic substances|significant new use|SNUN)\b")),
+ ("TSCA_8E", {"8e","8(e)"}, re.compile(r"(?i)\b(TSCA|PFAS|toxic substances|reporting requirements)\b")),
+ ("WAR_POWERS_5C", {"5(c)"}, re.compile(r"(?i)\b(war powers|armed forces|hostilities)\b")),
+ ("HOUSING_CHOICE_VOUCHER_8", {"8"}, re.compile(r"(?i)\b(housing choice voucher|HCV|HUD|section 8 housing)\b")),
+ ("PAMA_216", {"216"}, re.compile(r"(?i)\b(PAMA|protecting access to medicare|clinical laboratory|laboratory services)\b")),
+ ("HRSA_PCTE_747", {"747"}, re.compile(r"(?i)\b(primary care training|PCTE|HRSA|health resources and services administration)\b")),
+ ("OBBBA_899", {"899"}, re.compile(r"(?i)\b(one big beautiful|OBBBA|119-21|tax code|REIT)\b")),
+]
+
+def contextual_authority(section,text):
+    s=(section or "").lower().rstrip(".")
+    hits=[name for name,sections,rx in AUTHORITY_RULES if s in sections and rx.search(text or "")]
+    return hits[0] if len(hits)==1 else None
+
 def norm_bill_type(x):
     x=re.sub(r"[^A-Z]","",x.upper())
     return "HR" if x=="HR" else x
@@ -61,6 +91,10 @@ def resolve_clause(activity_id,clause_index,start,end,text,inherited_bill=None):
         elif nearest_bill:
             owner_type="BILL"; owner=f'{nearest_bill[1]["bill_type"]} {nearest_bill[1]["bill_number"]}'; distance=nearest_bill[0]
             confidence="HIGH" if distance<=60 else ("MEDIUM" if distance<=140 else "LOW"); ownership_basis="DIRECT_BILL"
+        if owner_type=="UNRESOLVED":
+            authority=contextual_authority(sec,text)
+            if authority:
+                owner_type="STATUTE_OR_CODE"; owner=authority; confidence="MEDIUM"; ownership_basis="CONTEXTUAL_AUTHORITY"
         if owner_type=="UNRESOLVED" and inherited_bill:
             owner_type="BILL"; owner=inherited_bill; confidence="LOW"; ownership_basis="INHERITED_PREVIOUS_CLAUSE"
         rows.append([activity_id,clause_index,start,end,sm.group(0),sec,owner_type,owner,distance,confidence,ambiguous,ownership_basis,text])
