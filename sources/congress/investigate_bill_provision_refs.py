@@ -111,7 +111,7 @@ def main():
         external=bool(STATUTE_RE.search(local))
         named_topic=bool(TOPIC_RE.search(local))
 
-        # Attribute a section to a neighboring bill only when that bill mention
+        # Attribute a section to another bill only when that bill mention
         # is closer to the section reference than the resolved target bill.
         section_m=re.search(r"(?i)(?:section|sec\.?)\s*[0-9]+[A-Za-z0-9().-]*",local)
         section_pos=section_m.start() if section_m else None
@@ -140,7 +140,7 @@ def main():
 
         if newest_ok: bucket="SECTION_EXISTS_IN_CURRENT_BILL"
         elif external: bucket="EXTERNAL_STATUTE_OR_CODE"
-        elif other_bills: bucket="NEIGHBORING_BILL_REFERENCE"
+        elif other_bills: bucket="SECTION_ATTRIBUTED_TO_OTHER_BILL"
         elif any_matches: bucket="HISTORICAL_OR_VERSION_CANDIDATE"
         elif nr and any(nr.split("(")[0] in sec for _,_,_,secs in vv for sec in secs):
             bucket="STRUCTURE_OR_NORMALIZATION_CANDIDATE"
@@ -152,7 +152,7 @@ def main():
         counts[bucket]=counts.get(bucket,0)+1
         target_distance=None if target_dist==10**9 else target_dist
         other_distance=other_bill_hits[0][0] if other_bill_hits else None
-        if bucket=="NEIGHBORING_BILL_REFERENCE":
+        if bucket=="SECTION_ATTRIBUTED_TO_OTHER_BILL":
             neighbor_diag.append({"target_bill":f"{bt} {bn}",
                                   "target_distance":target_distance,
                                   "other_distance":other_distance,
@@ -178,13 +178,13 @@ def main():
         by.setdefault(bill,{})[bucket]=by.setdefault(bill,{}).get(bucket,0)+1
     for bill,buckets in sorted(by.items(),key=lambda kv:-sum(kv[1].values()))[:30]:
         print({"bill":bill,"observations":sum(buckets.values()),"buckets":buckets})
-    print("NEIGHBORING_BILL_DIAGNOSTIC")
+    print("OTHER_BILL_ATTRIBUTION_DIAGNOSTIC")
     target_d=[x["target_distance"] for x in neighbor_diag if x["target_distance"] is not None]
     other_d=[x["other_distance"] for x in neighbor_diag if x["other_distance"] is not None]
     print({"count":len(neighbor_diag),
            "target_distance_median":sorted(target_d)[len(target_d)//2] if target_d else None,
            "other_distance_median":sorted(other_d)[len(other_d)//2] if other_d else None})
-    print("TOP_NEIGHBORING_BILL_PAIRS")
+    print("TOP_OTHER_BILL_ATTRIBUTIONS")
     pairs={}
     for x in neighbor_diag:
         for neighbor in x["neighbors"]:
