@@ -91,7 +91,7 @@ def main():
     with psycopg2.connect(db) as conn:
       with conn.cursor() as cur: cur.execute(q,(args.congress,)); rows=cur.fetchall()
 
-    s=sess(); cache={}; out=[]; counts={}
+    s=sess(); cache={}; out=[]; counts={}; neighbor_diag=[]
     for aid,cong,bt,bn,conf,fy,fp,local,ref in rows:
         k=(cong,bt,bn)
         if k not in cache:
@@ -122,6 +122,11 @@ def main():
         elif named_topic: bucket="NAMED_TOPIC_OR_PROVISION"
         else: bucket="UNRESOLVED_SECTION_REFERENCE"
         counts[bucket]=counts.get(bucket,0)+1
+        if bucket=="NEIGHBORING_BILL_REFERENCE":
+            neighbor_diag.append({"target_bill":f"{bt} {bn}",
+                                  "target_distance":None if target_dist==10**9 else target_dist,
+                                  "other_distance":other_bill_hits[0][0] if other_bill_hits else None,
+                                  "neighbors":[x[1] for x in other_bill_hits]})
         out.append([aid,cong,bt,bn,float(conf),fy,fp,ref,nr,bucket,
                     newest[0],newest[1],len(any_matches),
                     "|".join(other_bills[:5]),local.replace("\n"," ")[:520]])
@@ -141,21 +146,18 @@ def main():
         by.setdefault(bill,{})[bucket]=by.setdefault(bill,{}).get(bucket,0)+1
     for bill,buckets in sorted(by.items(),key=lambda kv:-sum(kv[1].values()))[:30]:
         print({"bill":bill,"observations":sum(buckets.values()),"buckets":buckets})
-    neigh=[r for r in out if r[9]=="NEIGHBORING_BILL_REFERENCE"]
     print("NEIGHBORING_BILL_DIAGNOSTIC")
-    target_d=[r[14] for r in neigh if r[14] is not None]
-    other_d=[r[15] for r in neigh if r[15] is not None]
-    print({"count":len(neigh),
+    target_d=[x["target_distance"] for x in neighbor_diag if x["target_distance"] is not None]
+    other_d=[x["other_distance"] for x in neighbor_diag if x["other_distance"] is not None]
+    print({"count":len(neighbor_diag),
            "target_distance_median":sorted(target_d)[len(target_d)//2] if target_d else None,
            "other_distance_median":sorted(other_d)[len(other_d)//2] if other_d else None})
     print("TOP_NEIGHBORING_BILL_PAIRS")
     pairs={}
-    for r in neigh:
-        target=f"{r[2]} {r[3]}"
-        for neighbor in (r[13] or "").split("|"):
-            if neighbor:
-                key=(target,neighbor.upper().replace(".",""))
-                pairs[key]=pairs.get(key,0)+1
+    for x in neighbor_diag:
+        for neighbor in x["neighbors"]:
+            key=(x["target_bill"],neighbor.upper().replace(".",""))
+            pairs[key]=pairs.get(key,0)+1
     for (target,neighbor),n in sorted(pairs.items(),key=lambda kv:(-kv[1],kv[0]))[:40]:
         print({"target_bill":target,"nearer_bill":neighbor,"observations":n})
 
