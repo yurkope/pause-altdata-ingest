@@ -113,20 +113,20 @@ def main():
 
         # Attribute a section to a neighboring bill only when that bill mention
         # is closer to the section reference than the resolved target bill.
-        section_m=re.search(r"(?i)(?:section|sec\\.?)\\s*[0-9]+[A-Za-z0-9().-]*",local)
+        section_m=re.search(r"(?i)(?:section|sec\.?)\s*[0-9]+[A-Za-z0-9().-]*",local)
         section_pos=section_m.start() if section_m else None
         if bt=="HR":
-            target_pattern=rf"(?i)\\bH\\.?R\\.?\\s*{bn}\\b"
+            target_pattern=rf"(?i)\bH\.?R\.?\s*{bn}\b"
         elif bt=="S":
-            target_pattern=rf"(?i)\\bS\\.?\\s*{bn}\\b"
+            target_pattern=rf"(?i)\bS\.?\s*{bn}\b"
         else:
-            target_pattern=rf"(?i)\\b{re.escape(bt)}\\.?\\s*{bn}\\b"
+            target_pattern=rf"(?i)\b{re.escape(bt)}\.?\s*{bn}\b"
         target_positions=[m.start() for m in re.finditer(target_pattern,local)]
         target_dist=min((abs(p-section_pos) for p in target_positions),default=10**9) if section_pos is not None else 10**9
 
         other_bill_hits=[]
         for hit in OTHER_BILL_RE.finditer(local):
-            digits=re.sub(r"\\D","",hit.group(0))
+            digits=re.sub(r"\D","",hit.group(0))
             # Same number is not enough by itself; also compare chamber/type.
             normalized_hit=hit.group(0).upper().replace(".","").replace(" ","")
             normalized_target=f"{bt}{bn}".upper().replace(".","").replace(" ","")
