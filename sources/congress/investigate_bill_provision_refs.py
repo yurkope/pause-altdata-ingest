@@ -5,9 +5,8 @@ Read-only. Uses Neon for LDA/bill evidence and Congress.gov for official bill te
 Outputs one CSV row per observation with an investigation bucket.
 
 Buckets:
-  VERIFIED_BILL_SECTION
+  SECTION_EXISTS_IN_CURRENT_BILL
   EXTERNAL_STATUTE_OR_CODE
-  NEIGHBORING_BILL_REFERENCE
   HISTORICAL_OR_VERSION_CANDIDATE
   STRUCTURE_OR_NORMALIZATION_CANDIDATE
   NAMED_TOPIC_OR_PROVISION
@@ -52,7 +51,8 @@ def formatted_url(v):
 def text_sections(s,url):
     r=s.get(url,timeout=(10,60)); r.raise_for_status()
     txt=html.unescape(re.sub(r"<[^>]+>","\n",r.text))
-    return {m.group(1).rstrip(".").lower() for m in SEC_RE.finditer(txt)}
+    return {m.group(1).rstrip(".").lower(): re.sub(r"\\s+"," ",m.group(2)).strip()
+            for m in SEC_RE.finditer(txt)}
 
 def norm(ref):
     m=re.search(r"(?i)(?:section|sec\.?)\s*([0-9]+[A-Za-z0-9().-]*)",ref or "")
@@ -105,7 +105,7 @@ def main():
                 time.sleep(args.sleep)
             cache[k]=parsed
         nr=norm(ref); vv=cache[k]
-        newest=vv[0] if vv else (None,None,None,set())
+        newest=vv[0] if vv else (None,None,None,{})
         newest_ok=bool(nr and nr in newest[3])
         any_matches=[v for v in vv if nr and nr in v[3]]
         external=bool(STATUTE_RE.search(local))
@@ -138,7 +138,7 @@ def main():
         other_bill_hits.sort(key=lambda x:x[0])
         other_bills=[x[1] for x in other_bill_hits]
 
-        if newest_ok: bucket="VERIFIED_BILL_SECTION"
+        if newest_ok: bucket="SECTION_EXISTS_IN_CURRENT_BILL"
         elif external: bucket="EXTERNAL_STATUTE_OR_CODE"
         elif other_bills: bucket="NEIGHBORING_BILL_REFERENCE"
         elif any_matches: bucket="HISTORICAL_OR_VERSION_CANDIDATE"
@@ -147,6 +147,8 @@ def main():
         elif named_topic: bucket="NAMED_TOPIC_OR_PROVISION"
         else: bucket="UNRESOLVED_SECTION_REFERENCE"
 
+        current_heading=newest[3].get(nr) if newest_ok else None
+        historical_heading=next((v[3].get(nr) for v in any_matches if v[3].get(nr)),None)
         counts[bucket]=counts.get(bucket,0)+1
         target_distance=None if target_dist==10**9 else target_dist
         other_distance=other_bill_hits[0][0] if other_bill_hits else None
@@ -156,14 +158,15 @@ def main():
                                   "other_distance":other_distance,
                                   "neighbors":[x[1] for x in other_bill_hits]})
         out.append([aid,cong,bt,bn,float(conf),fy,fp,ref,nr,bucket,
-                    newest[0],newest[1],len(any_matches),
+                    newest[0],newest[1],len(any_matches),current_heading,historical_heading,
                     "|".join(other_bills[:5]),target_distance,other_distance,
                     local.replace("\\n"," ")[:360]])
     with open(args.output,"w",newline="",encoding="utf-8") as fh:
         w=csv.writer(fh); w.writerow(["activity_id","congress","bill_type","bill_number",
         "resolution_confidence","filing_year","filing_period","section_ref","normalized_ref",
         "investigation_bucket","newest_text_version","newest_text_date","matching_text_versions",
-        "other_bill_refs","target_bill_distance","nearest_other_bill_distance","evidence_excerpt"]); w.writerows(out)
+        "current_section_heading","historical_section_heading","other_bill_refs",
+        "target_bill_distance","nearest_other_bill_distance","evidence_excerpt"]); w.writerows(out)
     print({"output":args.output,"observations":len(out)})
     print("BUCKETS")
     for k,v in sorted(counts.items(),key=lambda x:-x[1]):
