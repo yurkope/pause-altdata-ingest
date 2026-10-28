@@ -129,10 +129,22 @@ def main():
         w=csv.writer(fh); w.writerow(["activity_id","congress","bill_type","bill_number",
         "resolution_confidence","filing_year","filing_period","section_ref","normalized_ref",
         "investigation_bucket","newest_text_version","newest_text_date","matching_text_versions",
-        "other_bill_refs","evidence_excerpt"]); w.writerows(out)
+        "other_bill_refs","target_bill_distance","nearest_other_bill_distance","evidence_excerpt"]); w.writerows(out)
     print({"output":args.output,"observations":len(out)})
     print("BUCKETS")
     for k,v in sorted(counts.items(),key=lambda x:-x[1]):
         print({"bucket":k,"count":v,"pct":round(100*v/len(out),1) if out else 0})
+    print("BY_TARGET_BILL")
+    by={}
+    for r in out:
+        bill=f"{r[2]} {r[3]}"; bucket=r[9]
+        by.setdefault(bill,{})[bucket]=by.setdefault(bill,{}).get(bucket,0)+1
+    for bill,buckets in sorted(by.items(),key=lambda kv:-sum(kv[1].values()))[:30]:
+        print({"bill":bill,"observations":sum(buckets.values()),"buckets":buckets})
+    neigh=[r for r in out if r[9]=="NEIGHBORING_BILL_REFERENCE"]
+    print("NEIGHBORING_BILL_DIAGNOSTIC")
+    print({"count":len(neigh),
+           "target_distance_median":sorted([r[14] for r in neigh if r[14] is not None])[len([r for r in neigh if r[14] is not None])//2] if neigh else None,
+           "other_distance_median":sorted([r[15] for r in neigh if r[15] is not None])[len([r for r in neigh if r[15] is not None])//2] if neigh else None})
 
 if __name__=="__main__": main()
