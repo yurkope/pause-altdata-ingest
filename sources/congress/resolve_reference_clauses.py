@@ -16,7 +16,7 @@ STATUTE_RE=re.compile(
  r"endangered species act|internal revenue code|irc|dodd[- ]frank(?: act)?|"
  r"energy independence and security act|eisa|united states code|u\.?s\.?c\.?|"
  r"public law|p\.?l\.?|section 301 tariff|section 232)\b")
-CLAUSE_SPLIT_RE=re.compile(r"(?<=[.;])\s+|\s+(?:and|as well as)\s+(?=(?:H\.?R\.?|S\.?)\s*\d+\b)",re.I)
+CLAUSE_SPLIT_RE=re.compile(r"(?<=[.;])\s+|\s+(?:and|as well as)\s+(?=(?:H\.?R\.?|S\.?)\s*\d+\b)|(?<=:)\s+(?=(?:H\.?R\.?|S\.?)\s*\d+\b)",re.I)
 
 def norm_bill_type(x):
     x=re.sub(r"[^A-Z]","",x.upper())
@@ -47,13 +47,21 @@ def resolve_clause(activity_id,clause_index,start,end,text):
         statute_rank=sorted([(min(abs(sp-s["start"]),abs(sp-s["end"])),s) for s in statutes],key=lambda x:x[0])
         nearest_bill=bill_rank[0] if bill_rank else None
         nearest_statute=statute_rank[0] if statute_rank else None
-        owner_type="UNRESOLVED"; owner=None; distance=None; confidence="LOW"
-        if nearest_statute and (not nearest_bill or nearest_statute[0] < nearest_bill[0]):
+        owner_type="UNRESOLVED"; owner=None; distance=None; confidence="LOW"; ambiguous=False
+        candidates=[]
+        if nearest_bill: candidates.append(("BILL",nearest_bill[0]))
+        if nearest_statute: candidates.append(("STATUTE_OR_CODE",nearest_statute[0]))
+        candidates.sort(key=lambda x:x[1])
+        if len(candidates)>1 and abs(candidates[0][1]-candidates[1][1])<=20:
+            ambiguous=True
+        if ambiguous:
+            owner_type="AMBIGUOUS"; owner=None; distance=candidates[0][1]; confidence="LOW"
+        elif nearest_statute and (not nearest_bill or nearest_statute[0] < nearest_bill[0]):
             owner_type="STATUTE_OR_CODE"; owner=nearest_statute[1]["name"]; distance=nearest_statute[0]; confidence="MEDIUM"
         elif nearest_bill:
             owner_type="BILL"; owner=f'{nearest_bill[1]["bill_type"]} {nearest_bill[1]["bill_number"]}'; distance=nearest_bill[0]
             confidence="HIGH" if distance<=60 else ("MEDIUM" if distance<=140 else "LOW")
-        rows.append([activity_id,clause_index,start,end,sm.group(0),sec,owner_type,owner,distance,confidence,text])
+        rows.append([activity_id,clause_index,start,end,sm.group(0),sec,owner_type,owner,distance,confidence,ambiguous,text])
     return rows
 
 def main():
@@ -81,7 +89,7 @@ def main():
         w=csv.writer(fh)
         w.writerow(["activity_id","clause_index","clause_start","clause_end","section_ref",
                     "normalized_section","owner_type","owner","owner_distance",
-                    "resolution_confidence","clause_text"])
+                    "resolution_confidence","ambiguous_owner","clause_text"])
         w.writerows(out)
     counts={}
     for r in out: counts[r[6]]=counts.get(r[6],0)+1
