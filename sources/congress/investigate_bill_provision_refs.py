@@ -109,9 +109,34 @@ def main():
         newest_ok=bool(nr and nr in newest[3])
         any_matches=[v for v in vv if nr and nr in v[3]]
         external=bool(STATUTE_RE.search(local))
-        other_bills=[x.group(0) for x in OTHER_BILL_RE.finditer(local)
-                     if str(bn) not in re.sub(r"\D","",x.group(0))]
         named_topic=bool(TOPIC_RE.search(local))
+
+        # Attribute a section to a neighboring bill only when that bill mention
+        # is closer to the section reference than the resolved target bill.
+        section_m=re.search(r"(?i)(?:section|sec\\.?)\\s*[0-9]+[A-Za-z0-9().-]*",local)
+        section_pos=section_m.start() if section_m else None
+        if bt=="HR":
+            target_pattern=rf"(?i)\\bH\\.?R\\.?\\s*{bn}\\b"
+        elif bt=="S":
+            target_pattern=rf"(?i)\\bS\\.?\\s*{bn}\\b"
+        else:
+            target_pattern=rf"(?i)\\b{re.escape(bt)}\\.?\\s*{bn}\\b"
+        target_positions=[m.start() for m in re.finditer(target_pattern,local)]
+        target_dist=min((abs(p-section_pos) for p in target_positions),default=10**9) if section_pos is not None else 10**9
+
+        other_bill_hits=[]
+        for hit in OTHER_BILL_RE.finditer(local):
+            digits=re.sub(r"\\D","",hit.group(0))
+            # Same number is not enough by itself; also compare chamber/type.
+            normalized_hit=hit.group(0).upper().replace(".","").replace(" ","")
+            normalized_target=f"{bt}{bn}".upper().replace(".","").replace(" ","")
+            if normalized_hit==normalized_target:
+                continue
+            dist=abs(hit.start()-section_pos) if section_pos is not None else 10**9
+            if dist < target_dist:
+                other_bill_hits.append((dist,hit.group(0)))
+        other_bill_hits.sort(key=lambda x:x[0])
+        other_bills=[x[1] for x in other_bill_hits]
 
         if newest_ok: bucket="VERIFIED_BILL_SECTION"
         elif external: bucket="EXTERNAL_STATUTE_OR_CODE"
@@ -121,15 +146,19 @@ def main():
             bucket="STRUCTURE_OR_NORMALIZATION_CANDIDATE"
         elif named_topic: bucket="NAMED_TOPIC_OR_PROVISION"
         else: bucket="UNRESOLVED_SECTION_REFERENCE"
+
         counts[bucket]=counts.get(bucket,0)+1
+        target_distance=None if target_dist==10**9 else target_dist
+        other_distance=other_bill_hits[0][0] if other_bill_hits else None
         if bucket=="NEIGHBORING_BILL_REFERENCE":
             neighbor_diag.append({"target_bill":f"{bt} {bn}",
-                                  "target_distance":None if target_dist==10**9 else target_dist,
-                                  "other_distance":other_bill_hits[0][0] if other_bill_hits else None,
+                                  "target_distance":target_distance,
+                                  "other_distance":other_distance,
                                   "neighbors":[x[1] for x in other_bill_hits]})
         out.append([aid,cong,bt,bn,float(conf),fy,fp,ref,nr,bucket,
                     newest[0],newest[1],len(any_matches),
-                    "|".join(other_bills[:5]),local.replace("\n"," ")[:520]])
+                    "|".join(other_bills[:5]),target_distance,other_distance,
+                    local.replace("\\n"," ")[:360]])
     with open(args.output,"w",newline="",encoding="utf-8") as fh:
         w=csv.writer(fh); w.writerow(["activity_id","congress","bill_type","bill_number",
         "resolution_confidence","filing_year","filing_period","section_ref","normalized_ref",
