@@ -143,8 +143,20 @@ def main():
         print({"bill":bill,"observations":sum(buckets.values()),"buckets":buckets})
     neigh=[r for r in out if r[9]=="NEIGHBORING_BILL_REFERENCE"]
     print("NEIGHBORING_BILL_DIAGNOSTIC")
+    target_d=[r[14] for r in neigh if r[14] is not None]
+    other_d=[r[15] for r in neigh if r[15] is not None]
     print({"count":len(neigh),
-           "target_distance_median":sorted([r[14] for r in neigh if r[14] is not None])[len([r for r in neigh if r[14] is not None])//2] if neigh else None,
-           "other_distance_median":sorted([r[15] for r in neigh if r[15] is not None])[len([r for r in neigh if r[15] is not None])//2] if neigh else None})
+           "target_distance_median":sorted(target_d)[len(target_d)//2] if target_d else None,
+           "other_distance_median":sorted(other_d)[len(other_d)//2] if other_d else None})
+    print("TOP_NEIGHBORING_BILL_PAIRS")
+    pairs={}
+    for r in neigh:
+        target=f"{r[2]} {r[3]}"
+        for neighbor in (r[13] or "").split("|"):
+            if neighbor:
+                key=(target,neighbor.upper().replace(".",""))
+                pairs[key]=pairs.get(key,0)+1
+    for (target,neighbor),n in sorted(pairs.items(),key=lambda kv:(-kv[1],kv[0]))[:40]:
+        print({"target_bill":target,"nearer_bill":neighbor,"observations":n})
 
 if __name__=="__main__": main()
