@@ -99,5 +99,25 @@ def main():
     print("VALIDATION_STATUS")
     for k,v in sorted(counts.items(),key=lambda x:-x[1]):
         print({"status":k,"count":v,"pct":round(100*v/len(out),1) if out else 0})
+    failed=[r for r in out if r["official_validation_status"]=="SECTION_NOT_FOUND_IN_OFFICIAL_TEXT"]
+    by_basis={}; by_section={}
+    for r in failed:
+        by_basis[r.get("ownership_basis")]=by_basis.get(r.get("ownership_basis"),0)+1
+        by_section[r.get("normalized_section")]=by_section.get(r.get("normalized_section"),0)+1
+    print("FAILED_BY_OWNERSHIP_BASIS")
+    for k,v in sorted(by_basis.items(),key=lambda x:-x[1]):
+        print({"basis":k,"count":v,"pct_of_failed":round(100*v/len(failed),1) if failed else 0})
+    print("TOP_FAILED_SECTIONS")
+    for k,v in sorted(by_section.items(),key=lambda x:(-x[1],str(x[0])))[:40]:
+        print({"section":k,"count":v})
+    print("FAILED_CONTEXT_SAMPLES")
+    shown={}
+    for r in failed:
+        sec=r.get("normalized_section")
+        if shown.get(sec,0)>=2 or by_section.get(sec,0)<2: continue
+        print({"section":sec,"owner":r.get("owner"),"basis":r.get("ownership_basis"),
+               "clause":(r.get("clause_text") or "")[:500]})
+        shown[sec]=shown.get(sec,0)+1
+        if sum(shown.values())>=30: break
 
 if __name__=="__main__": main()
