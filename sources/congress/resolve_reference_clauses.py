@@ -111,6 +111,21 @@ def main():
     print("OWNER_TYPES")
     for k,v in sorted(counts.items(),key=lambda x:-x[1]):
         print({"owner_type":k,"count":v,"pct":round(100*v/len(out),1) if out else 0})
+    unresolved=[r for r in out if r[6]=="UNRESOLVED"]
+    section_counts={}
+    for r in unresolved: section_counts[r[5]]=section_counts.get(r[5],0)+1
+    print("TOP_UNRESOLVED_SECTIONS")
+    for sec,n in sorted(section_counts.items(),key=lambda x:(-x[1],str(x[0])))[:40]:
+        print({"section":sec,"count":n})
+    print("UNRESOLVED_CONTEXT_SAMPLES")
+    shown={}
+    for r in unresolved:
+        sec=r[5]
+        if shown.get(sec,0)>=2: continue
+        if section_counts.get(sec,0)<3: continue
+        print({"section":sec,"clause":r[12][:500]})
+        shown[sec]=shown.get(sec,0)+1
+        if sum(shown.values())>=30: break
     print("OWNERSHIP_BASIS")
     for k,v in sorted(bases.items(),key=lambda x:-x[1]):
         print({"basis":k or "NONE","count":v,"pct":round(100*v/len(out),1) if out else 0})
