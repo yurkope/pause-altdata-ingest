@@ -15,6 +15,16 @@ from urllib3.util.retry import Retry
 BASE="https://api.congress.gov/v3"
 SEC_RE=re.compile(r"(?im)^\s*(?:SEC\.|SECTION)\s+([0-9]+[A-Za-z0-9().-]*)[.\s-]+(.{0,240})$")
 
+UNDERLYING_AUTHORITY_RE=re.compile(
+ r"(?i)\b(?:section|sec\.?)\s*[0-9]+[A-Za-z0-9().-]*\s+of\s+(?:title\s+[IVXLCDM0-9]+\s+of\s+)?"
+ r"(?:the\s+)?(?P<authority>[A-Z][A-Za-z0-9&'().,\- ]{2,100}?"
+ r"(?:Act|Code|Resolution|Constitution|U\.?S\.?C\.?))\b")
+AMEND_SECTION_RE=re.compile(r"(?i)\b(?:amend|amends|amending|repeal|repeals|repealing|modify|modifies|modifying)\b.{0,100}\b(?:section|sec\.?)\b")
+
+def underlying_authority(clause):
+    m=UNDERLYING_AUTHORITY_RE.search(clause or "")
+    return re.sub(r"\s+"," ",m.group("authority")).strip(" ,.;") if m else None
+
 def session():
     s=requests.Session()
     retry=Retry(total=8,connect=8,read=8,status=8,backoff_factor=1,
@@ -78,7 +88,11 @@ def main():
         current=bool(sec in newest[2])
         historical=bool(matches and not current)
         heading=(newest[2].get(sec) if current else (matches[0][2].get(sec) if matches else None))
-        if current and r["ownership_basis"]=="DIRECT_BILL":
+        external=underlying_authority(r.get("clause_text") or "")
+        amend_external=bool(external and AMEND_SECTION_RE.search(r.get("clause_text") or ""))
+        if external:
+            status="UNDERLYING_AUTHORITY_SECTION"
+        elif current and r["ownership_basis"]=="DIRECT_BILL":
             status="VALIDATED_BILL_PROVISION_CURRENT"
         elif historical and r["ownership_basis"]=="DIRECT_BILL":
             status="VALIDATED_BILL_PROVISION_HISTORICAL"
@@ -89,6 +103,8 @@ def main():
         else:
             status="REJECTED_BILL_PROVISION_CANDIDATE"
         out.append({**r,"official_validation_status":status,
+                    "underlying_authority":external,
+                    "amends_underlying_authority":amend_external,
                     "newest_text_version":newest[0],"newest_text_date":newest[1],
                     "matching_text_versions":"|".join(str(v[0]) for v in matches),
                     "official_section_heading":heading})
