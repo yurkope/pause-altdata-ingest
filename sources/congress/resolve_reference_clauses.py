@@ -10,7 +10,7 @@ import psycopg2
 from dotenv import load_dotenv
 
 BILL_RE=re.compile(r"(?i)\b(?P<type>H\.?R\.?|S\.?)\s*(?P<number>\d+)\b")
-SECTION_RE=re.compile(r"(?i)\\b(?:section|sec\\.?)\\s*(?P<section>[0-9]+(?:\\.[0-9]+)*(?:[A-Za-z]+)?(?:\\([A-Za-z0-9]+\\))*)")
+SECTION_RE=re.compile(r"(?i)\b(?:section|sec\.?)\s*(?P<section>[0-9]+(?:\.[0-9]+)*(?:[A-Za-z]+)?(?:\([A-Za-z0-9]+\))*)")
 STATUTE_RE=re.compile(
  r"(?i)\b(clean air act|clean water act|national environmental policy act|nepa|"
  r"endangered species act|internal revenue code|irc|dodd[- ]frank(?: act)?|"

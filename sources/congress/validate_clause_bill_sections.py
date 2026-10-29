@@ -13,7 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 BASE="https://api.congress.gov/v3"
-EXPLICIT_CONGRESS_RE=re.compile(r"(?i)\\b(?P<congress>\\d{3})(?:st|nd|rd|th)\\s+Congress\\b")
+EXPLICIT_CONGRESS_RE=re.compile(r"(?i)\b(?P<congress>\d{3})(?:st|nd|rd|th)\s+Congress\b")
 SEC_RE=re.compile(r"(?im)^\s*(?:SEC\.|SECTION)\s+([0-9]+[A-Za-z0-9().-]*)[.\s-]+(.{0,240})$")
 
 UNDERLYING_AUTHORITY_RE=re.compile(
