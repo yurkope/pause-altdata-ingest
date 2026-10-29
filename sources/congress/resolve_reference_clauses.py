@@ -94,17 +94,18 @@ def resolve_clause(activity_id,clause_index,start,end,text,inherited_bill=None):
         candidates.sort(key=lambda x:x[1])
         if len(candidates)>1 and abs(candidates[0][1]-candidates[1][1])<=20:
             ambiguous=True
-        if ambiguous:
+        # A recognized section+context authority is stronger evidence than
+        # mere proximity to a bill token. Resolve it before nearest-bill logic.
+        authority=contextual_authority(sec,text)
+        if authority:
+            owner_type="STATUTE_OR_CODE"; owner=authority; confidence="MEDIUM"; ownership_basis="CONTEXTUAL_AUTHORITY"
+        elif ambiguous:
             owner_type="AMBIGUOUS"; owner=None; distance=candidates[0][1]; confidence="LOW"
         elif nearest_statute and (not nearest_bill or nearest_statute[0] < nearest_bill[0]):
             owner_type="STATUTE_OR_CODE"; owner=nearest_statute[1]["name"]; distance=nearest_statute[0]; confidence="MEDIUM"; ownership_basis="DIRECT_STATUTE"
         elif nearest_bill:
             owner_type="BILL"; owner=f'{nearest_bill[1]["bill_type"]} {nearest_bill[1]["bill_number"]}'; distance=nearest_bill[0]
             confidence="HIGH" if distance<=60 else ("MEDIUM" if distance<=140 else "LOW"); ownership_basis="DIRECT_BILL"
-        if owner_type=="UNRESOLVED":
-            authority=contextual_authority(sec,text)
-            if authority:
-                owner_type="STATUTE_OR_CODE"; owner=authority; confidence="MEDIUM"; ownership_basis="CONTEXTUAL_AUTHORITY"
         if owner_type=="UNRESOLVED" and inherited_bill:
             owner_type="BILL"; owner=inherited_bill; confidence="LOW"; ownership_basis="INHERITED_PREVIOUS_CLAUSE"
         rows.append([activity_id,clause_index,start,end,sm.group(0),sec,owner_type,owner,distance,confidence,ambiguous,ownership_basis,text])
