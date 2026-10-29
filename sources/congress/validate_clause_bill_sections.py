@@ -90,8 +90,12 @@ def main():
         heading=(newest[2].get(sec) if current else (matches[0][2].get(sec) if matches else None))
         external=underlying_authority(r.get("clause_text") or "")
         amend_external=bool(external and AMEND_SECTION_RE.search(r.get("clause_text") or ""))
+        official_heading=(current or historical or {}).get("heading","")
+        heading_external=bool(re.match(r"(?i)^\\s*of\\s+(?:title\\s+[IVXLCDM0-9]+\\s+of\\s+)?(?:the\\s+)?",official_heading or ""))
         if external:
             status="UNDERLYING_AUTHORITY_SECTION"
+        elif heading_external:
+            status="OFFICIAL_TEXT_AMENDS_UNDERLYING_AUTHORITY"
         elif current and r["ownership_basis"]=="DIRECT_BILL":
             status="VALIDATED_BILL_PROVISION_CURRENT"
         elif historical and r["ownership_basis"]=="DIRECT_BILL":
@@ -105,6 +109,7 @@ def main():
         out.append({**r,"official_validation_status":status,
                     "underlying_authority":external,
                     "amends_underlying_authority":amend_external,
+                    "official_heading_external_guard":heading_external,
                     "newest_text_version":newest[0],"newest_text_date":newest[1],
                     "matching_text_versions":"|".join(str(v[0]) for v in matches),
                     "official_section_heading":heading})
