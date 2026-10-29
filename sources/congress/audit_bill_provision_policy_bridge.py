@@ -130,14 +130,15 @@ def main():
             "policy_code","validation_status")})
 
     print("NO_CANONICAL_BILL_MAP")
-    seen=set()
-    for r in unmapped:
-        k=(r["congress"],r["bill_type"],r["bill_number"])
-        if k in seen: continue
-        seen.add(k)
-        print({"congress":r["congress"],"bill_type":r["bill_type"],
-               "bill_number":r["bill_number"],"activity_id":r["activity_id"],
-               "section_ref":r["section_ref"]})
+    uc=Counter((r["congress"],r["bill_type"],r["bill_number"]) for r in unmapped)
+    for (congress,bill_type,bill_number),count in uc.most_common():
+        samples=[r for r in unmapped
+                 if (r["congress"],r["bill_type"],r["bill_number"]) ==
+                    (congress,bill_type,bill_number)]
+        print({"congress":congress,"bill_type":bill_type,
+               "bill_number":bill_number,"candidate_rows":count,
+               "distinct_activities":len({r["activity_id"] for r in samples}),
+               "sections":sorted({r["section_ref"] for r in samples})})
 
 if __name__=="__main__":
     main()
