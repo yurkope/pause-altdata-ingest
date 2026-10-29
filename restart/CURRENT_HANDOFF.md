@@ -257,3 +257,38 @@ Before changing code:
 ## USER WORKING PREFERENCE
 
 Act as project engineer/coder/project manager. Keep the project moving autonomously where user input is not needed. Stop for genuine business/product choices, inaccessible local-only artifacts, cost commitments, or destructive production changes requiring approval.
+
+
+## UPDATE — PROVISION POLICY IMPLEMENTATION (2026-10-29)
+
+Resolver inspection found that production currently defines corroboration as:
+COUNT(DISTINCT evidence_method) > 1.
+
+Therefore bill_anchor + bill_provision MUST NOT be treated as independent corroboration when
+the provision is a refinement of the same bill evidence. The earlier idea of adding
+'bill_provision' to activity_policy_evidence as a new evidence_method was retired before
+production changes.
+
+Current design:
+- provision policy is a refinement/mapping layer;
+- no production schema change;
+- no durable provision evidence rows yet;
+- no extra filing-dollar allocation;
+- omnibus bills use bill + section policy mappings.
+
+New controlled artifact:
+- signals/bill_provision_policy_v1_manifest.csv
+
+Initial mappings include deterministic MEDICAID, HOUSING and RIGHT_TO_REPAIR cases.
+Imperfect H.R.1 tax/education mappings are explicitly marked REVIEW rather than forced.
+
+Relevant commits:
+- 5573168 — add provision-level policy mapping manifest
+- 01f7613 — prevent false corroboration from provision evidence
+
+Next:
+1. audit the manifest against the 25 validated provision observations;
+2. quantify incremental policy coverage under refinement semantics;
+3. inspect REVIEW mappings and decide whether existing taxonomy is sufficient or narrowly
+   justified new substantive policy codes are needed;
+4. keep production unchanged until that audit is complete.
