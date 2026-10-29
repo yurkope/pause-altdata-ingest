@@ -106,8 +106,11 @@ def resolve_clause(activity_id,clause_index,start,end,text,inherited_bill=None):
         elif nearest_bill:
             owner_type="BILL"; owner=f'{nearest_bill[1]["bill_type"]} {nearest_bill[1]["bill_number"]}'; distance=nearest_bill[0]
             confidence="HIGH" if distance<=60 else ("MEDIUM" if distance<=140 else "LOW"); ownership_basis="DIRECT_BILL"
+        # Prior validation showed inherited bill ownership is too noisy to
+        # support provision attribution. Preserve the inherited bill only as a
+        # candidate/context field; do not promote it to BILL ownership.
         if owner_type=="UNRESOLVED" and inherited_bill:
-            owner_type="BILL"; owner=inherited_bill; confidence="LOW"; ownership_basis="INHERITED_PREVIOUS_CLAUSE"
+            owner=inherited_bill; confidence="LOW"; ownership_basis="INHERITED_BILL_CANDIDATE"
         rows.append([activity_id,clause_index,start,end,sm.group(0),sec,owner_type,owner,distance,confidence,ambiguous,ownership_basis,text])
     return rows
 
