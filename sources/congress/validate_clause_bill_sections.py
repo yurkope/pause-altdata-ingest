@@ -91,7 +91,7 @@ def main():
         external=underlying_authority(r.get("clause_text") or "")
         amend_external=bool(external and AMEND_SECTION_RE.search(r.get("clause_text") or ""))
         official_heading=heading or ""
-        heading_external=bool(re.match(r"(?i)^\\s*of\\s+(?:title\\s+[IVXLCDM0-9]+\\s+of\\s+)?(?:the\\s+)?",official_heading))
+        heading_external=bool(re.match(r"(?i)^\\s*of\\b",official_heading))
         if external:
             status="UNDERLYING_AUTHORITY_SECTION"
         elif heading_external:
