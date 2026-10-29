@@ -106,6 +106,17 @@ def main():
     for r in failed:
         by_basis[r.get("ownership_basis")]=by_basis.get(r.get("ownership_basis"),0)+1
         by_section[r.get("normalized_section")]=by_section.get(r.get("normalized_section"),0)+1
+    validated=[r for r in out if r["official_validation_status"].startswith("VALIDATED_BILL_PROVISION_")]
+    print("VALIDATED_PROVISIONS")
+    for r in validated:
+        print({"activity_id":r.get("activity_id"),"bill":r.get("owner"),
+               "section":r.get("normalized_section"),
+               "status":r.get("official_validation_status"),
+               "text_version":r.get("newest_text_version"),
+               "text_date":r.get("newest_text_date"),
+               "matching_versions":r.get("matching_text_versions"),
+               "heading":r.get("official_section_heading"),
+               "clause":(r.get("clause_text") or "")[:500]})
     print("FAILED_BY_OWNERSHIP_BASIS")
     for k,v in sorted(by_basis.items(),key=lambda x:-x[1]):
         print({"basis":k,"count":v,"pct_of_failed":round(100*v/len(failed),1) if failed else 0})
