@@ -87,7 +87,7 @@ def main():
                 time.sleep(args.sleep)
             cache[k]=parsed
         vv=cache[k]; sec=r["normalized_section"].lower().rstrip(".")
-        root_match=re.match(r"^(?P<root>[0-9]+[A-Za-z]*)(?P<nested>\\(.*)$",sec)
+        root_match=re.match(r"^(?P<root>[0-9]+[A-Za-z]*)(?P<nested>\(.*)$",sec)
         validation_root=root_match.group("root") if root_match else sec
         hierarchical=bool(root_match)
         exact_matches=[v for v in vv if sec in v[2]]
