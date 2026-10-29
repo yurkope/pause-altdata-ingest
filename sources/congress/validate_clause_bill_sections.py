@@ -13,6 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 BASE="https://api.congress.gov/v3"
+EXPLICIT_CONGRESS_RE=re.compile(r"(?i)\\b(?P<congress>\\d{3})(?:st|nd|rd|th)\\s+Congress\\b")
 SEC_RE=re.compile(r"(?im)^\s*(?:SEC\.|SECTION)\s+([0-9]+[A-Za-z0-9().-]*)[.\s-]+(.{0,240})$")
 
 UNDERLYING_AUTHORITY_RE=re.compile(
@@ -68,9 +69,12 @@ def main():
     s=session(); cache={}; out=[]
     for r in bill_rows:
         bt,bn=r["owner"].split()
-        k=(args.congress,bt,int(bn))
+        clause=r.get("clause_text") or ""
+        cm=EXPLICIT_CONGRESS_RE.search(clause)
+        row_congress=int(cm.group("congress")) if cm else args.congress
+        k=(row_congress,bt,int(bn))
         if k not in cache:
-            j=api(s,key,f"/bill/{args.congress}/{bt.lower()}/{bn}/text")
+            j=api(s,key,f"/bill/{row_congress}/{bt.lower()}/{bn}/text")
             vv=j.get("textVersions",[])
             vv=sorted(vv,key=lambda v:parse_date(v.get("date")),reverse=True)
             parsed=[]
@@ -107,6 +111,7 @@ def main():
         else:
             status="REJECTED_BILL_PROVISION_CANDIDATE"
         out.append({**r,"official_validation_status":status,
+                    "validation_congress":row_congress,
                     "underlying_authority":external,
                     "amends_underlying_authority":amend_external,
                     "official_heading_external_guard":heading_external,
