@@ -87,11 +87,19 @@ def main():
                 time.sleep(args.sleep)
             cache[k]=parsed
         vv=cache[k]; sec=r["normalized_section"].lower().rstrip(".")
-        matches=[v for v in vv if sec in v[2]]
+        root_match=re.match(r"^(?P<root>[0-9]+[A-Za-z]*)(?P<nested>\\(.*)$",sec)
+        validation_root=root_match.group("root") if root_match else sec
+        hierarchical=bool(root_match)
+        exact_matches=[v for v in vv if sec in v[2]]
+        root_matches=[v for v in vv if validation_root in v[2]] if hierarchical else exact_matches
+        matches=exact_matches or root_matches
         newest=vv[0] if vv else (None,None,{})
-        current=bool(sec in newest[2])
+        exact_current=bool(sec in newest[2])
+        root_current=bool(validation_root in newest[2]) if hierarchical else exact_current
+        current=exact_current or root_current
         historical=bool(matches and not current)
-        heading=(newest[2].get(sec) if current else (matches[0][2].get(sec) if matches else None))
+        matched_section=(sec if exact_matches else validation_root)
+        heading=(newest[2].get(matched_section) if current else (matches[0][2].get(matched_section) if matches else None))
         external=underlying_authority(r.get("clause_text") or "")
         amend_external=bool(external and AMEND_SECTION_RE.search(r.get("clause_text") or ""))
         official_heading=heading or ""
@@ -100,6 +108,10 @@ def main():
             status="UNDERLYING_AUTHORITY_SECTION"
         elif heading_external:
             status="OFFICIAL_TEXT_AMENDS_UNDERLYING_AUTHORITY"
+        elif hierarchical and not exact_matches and root_current and r["ownership_basis"]=="DIRECT_BILL":
+            status="SECTION_ROOT_EXISTS_SUBSECTION_UNVERIFIED"
+        elif hierarchical and not exact_matches and root_matches and r["ownership_basis"]=="DIRECT_BILL":
+            status="SECTION_ROOT_EXISTS_HISTORICAL_SUBSECTION_UNVERIFIED"
         elif current and r["ownership_basis"]=="DIRECT_BILL":
             status="VALIDATED_BILL_PROVISION_CURRENT"
         elif historical and r["ownership_basis"]=="DIRECT_BILL":
@@ -112,6 +124,10 @@ def main():
             status="REJECTED_BILL_PROVISION_CANDIDATE"
         out.append({**r,"official_validation_status":status,
                     "validation_congress":row_congress,
+                    "validation_section_root":validation_root,
+                    "hierarchical_section_reference":hierarchical,
+                    "exact_section_match":bool(exact_matches),
+                    "root_section_match":bool(root_matches),
                     "underlying_authority":external,
                     "amends_underlying_authority":amend_external,
                     "official_heading_external_guard":heading_external,
