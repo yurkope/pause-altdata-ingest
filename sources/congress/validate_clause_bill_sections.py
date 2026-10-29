@@ -79,13 +79,15 @@ def main():
         historical=bool(matches and not current)
         heading=(newest[2].get(sec) if current else (matches[0][2].get(sec) if matches else None))
         if current and r["ownership_basis"]=="DIRECT_BILL":
-            status="CLAUSE_ATTRIBUTED_SECTION_EXISTS_CURRENT"
+            status="VALIDATED_BILL_PROVISION_CURRENT"
+        elif historical and r["ownership_basis"]=="DIRECT_BILL":
+            status="VALIDATED_BILL_PROVISION_HISTORICAL"
         elif current:
             status="SECTION_EXISTS_CURRENT_ATTRIBUTION_WEAK"
         elif historical:
             status="SECTION_EXISTS_HISTORICAL_VERSION"
         else:
-            status="SECTION_NOT_FOUND_IN_OFFICIAL_TEXT"
+            status="REJECTED_BILL_PROVISION_CANDIDATE"
         out.append({**r,"official_validation_status":status,
                     "newest_text_version":newest[0],"newest_text_date":newest[1],
                     "matching_text_versions":"|".join(str(v[0]) for v in matches),
@@ -99,7 +101,7 @@ def main():
     print("VALIDATION_STATUS")
     for k,v in sorted(counts.items(),key=lambda x:-x[1]):
         print({"status":k,"count":v,"pct":round(100*v/len(out),1) if out else 0})
-    failed=[r for r in out if r["official_validation_status"]=="SECTION_NOT_FOUND_IN_OFFICIAL_TEXT"]
+    failed=[r for r in out if r["official_validation_status"]=="REJECTED_BILL_PROVISION_CANDIDATE"]
     by_basis={}; by_section={}
     for r in failed:
         by_basis[r.get("ownership_basis")]=by_basis.get(r.get("ownership_basis"),0)+1
