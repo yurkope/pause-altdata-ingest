@@ -36,6 +36,7 @@ def main():
     p.add_argument("--year",type=int,default=2025); p.add_argument("--quarter",default="Q1")
     p.add_argument("--congresses",default="118,119"); p.add_argument("--top",type=int,default=1000)
     p.add_argument("--rank-by",choices=["mentions","dollars","hybrid"],default="hybrid")
+    p.add_argument("--bill",action="append",default=[],help="Force a bill token into the resolver queue, e.g. HR5039 or S123. Repeatable.")
     p.add_argument("--write",action="store_true"); args=p.parse_args()
     congresses=[int(x) for x in args.congresses.split(",")]
     load_dotenv(); db_url,key=os.getenv("DATABASE_URL"),os.getenv("CONGRESS_API_KEY")
@@ -62,9 +63,23 @@ def main():
         dr={k:i for i,k in enumerate(sorted(counts,key=lambda x:dollars[x],reverse=True),1)}
         ranked=sorted(counts,key=lambda x:(mr[x]+dr[x],-counts[x]))
     else: ranked=[k for k,_ in counts.most_common()]
+    # Low-frequency but independently validated bills may fall below --top. Explicit
+    # --bill targets are appended to the ranked queue without increasing the broad
+    # discovery limit. This is deterministic and keeps API/database work bounded.
+    forced=[]
+    for raw in args.bill:
+        token=raw.upper().replace(".","").replace("-","").replace(" ","")
+        import re
+        m=re.fullmatch(r"(HR|S)(\d+)",token)
+        if not m: raise SystemExit(f"Invalid --bill {raw!r}; expected HR5039 or S123")
+        forced.append((m.group(1),int(m.group(2))))
+    queue=list(ranked[:args.top])
+    for token in forced:
+        if token not in queue: queue.append(token)
+
     session=requests.Session(); decisions=Counter(); assigned=Counter(); resolved=set()
     try:
-        for typ,number in ranked[:args.top]:
+        for typ,number in queue:
             bills={}
             for congress in congresses:
                 try:
