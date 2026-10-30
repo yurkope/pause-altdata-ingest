@@ -17,7 +17,6 @@ from collections import Counter
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
 
 DEFAULT_STATUSES = {
     "OFFICIAL_TEXT_AMENDS_UNDERLYING_AUTHORITY",
@@ -123,7 +122,7 @@ def parse_result(raw: str) -> dict[str, Any]:
     }
 
 
-def adjudicate(client: OpenAI, model: str, row: dict[str, str]) -> dict[str, Any]:
+def adjudicate(client: Any, model: str, row: dict[str, str]) -> dict[str, Any]:
     response = client.responses.create(
         model=model,
         input=[
@@ -192,7 +191,7 @@ def main() -> None:
     key = os.getenv("OPENAI_API_KEY")
     if not key:
         raise SystemExit("OPENAI_API_KEY is not set in .env or environment")
-    client = OpenAI(api_key=key)
+    try:\n        from openai import OpenAI\n    except ImportError as exc:\n        raise SystemExit("OpenAI SDK is required only for --execute: pip install openai") from exc\n    client = OpenAI(api_key=key)
 
     out = []
     for i, row in enumerate(candidates, 1):
