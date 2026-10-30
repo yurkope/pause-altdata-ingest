@@ -292,3 +292,56 @@ Next:
 3. inspect REVIEW mappings and decide whether existing taxonomy is sufficient or narrowly
    justified new substantive policy codes are needed;
 4. keep production unchanged until that audit is complete.
+
+
+## UPDATE — 2026-10-30: STORAGE + LOW-FREQUENCY BILL RECOVERY
+
+Neon sent a storage alert on 2026-10-29: project wispy-bird-56636783 reached 100% of its
+1.07 GB monthly storage allowance. The allowance is expected to reset at the next monthly
+period. User chose not to upgrade for the POC. Until reset:
+- prefer GitHub/local work;
+- avoid unnecessary Neon queries;
+- no emergency deletion;
+- no paid-plan upgrade;
+- production remains unchanged.
+
+H.R.5039 diagnosis:
+- official provision validation found a legitimate H.R.5039 section 2 reference;
+- H.R.5039 was absent from policy.bill;
+- transition resolver only processed ranked[:--top] (default 1000);
+- low-frequency bills can therefore validate later yet never enter the bill corpus.
+
+Fix:
+- resolve_bills_transition.py now accepts repeatable --bill targets, e.g. --bill HR5039;
+- forced targets append to the bounded resolver queue without expanding broad discovery;
+- export_validated_bill_targets.py converts fully validated provision observations into
+  targeted resolver arguments;
+- only VALIDATED_BILL_PROVISION_CURRENT/HISTORICAL qualify;
+- regression tests prevent rejected, underlying-authority, or root-only observations from
+  forcing ingestion.
+
+Reference normalization:
+- sources/congress/reference_normalization.py now centralizes section token parsing/root logic;
+- resolver and validator use the shared helper;
+- tests cover section 4-water -> 4, nested 4(a)(B), 12007, and 505g(c).
+
+Relevant commits:
+- 899e549 — targeted low-frequency bill resolution
+- b3badd1 — targeted resolver regression tests
+- cb27528 — validated bill target exporter
+- 61b60cd — feedback exporter tests
+- 1bd22c9 — shared reference normalization
+- 2dc6ec4 — normalization regression tests
+- ca329ce — resolver uses shared normalization
+- 457b3c9 — validator uses shared normalization
+
+Current Congress pipeline:
+LDA reference -> bill resolution -> provision ownership -> official validation
+-> low-frequency validated-bill feedback -> targeted bill resolution
+-> provision-policy mapping.
+
+Next after Neon reset:
+1. run targeted resolution for H.R.5039;
+2. verify it enters policy.bill/bill_mention correctly;
+3. run provision-policy refinement audit;
+4. evaluate higher-ed taxonomy promotion only after audit.
