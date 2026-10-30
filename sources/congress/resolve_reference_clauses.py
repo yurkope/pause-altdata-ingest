@@ -8,6 +8,7 @@ ambiguity and never treats co-occurrence as proof of lobbying contact.
 import argparse,csv,os,re
 import psycopg2
 from dotenv import load_dotenv
+from reference_normalization import SECTION_TOKEN_RE
 
 BILL_RE=re.compile(r"(?i)\b(?P<type>H\.?R\.?|S\.?)\s*(?P<number>\d+)\b")
 SECTION_RE=re.compile(r"(?i)\b(?:section|sec\.?)\s*(?P<section>[0-9]+(?:\.[0-9]+)*(?:[A-Za-z]+)?(?:\([A-Za-z0-9]+\))*)")
