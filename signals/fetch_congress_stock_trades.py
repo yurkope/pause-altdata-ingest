@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Fetch a narrow congressional stock-trade slice from a Datasette JSON API.
+
+Designed for external validation artifacts; no Neon writes.
+Example:
+ python signals/fetch_congress_stock_trades.py \
+   --base-url https://regs.datadawn.org \
+   --database openregs --year 2025 --out data/congress_stock_trades_2025.csv
+
+The endpoint/database name can be overridden because serving layouts can change.
+"""
+from __future__ import annotations
+import argparse,csv,json,urllib.parse,urllib.request
+from pathlib import Path
+
+COLS=["member_name","bioguide_id","chamber","transaction_date","ticker",
+"asset_description","transaction_type","amount_range","owner","source_url","filing_type"]
+
+def get_json(url):
+    req=urllib.request.Request(url,headers={"User-Agent":"Quant-research/1.0"})
+    with urllib.request.urlopen(req,timeout=60) as r:
+        return json.load(r)
+
+def main():
+    p=argparse.ArgumentParser()
+    p.add_argument("--base-url",required=True); p.add_argument("--database",required=True)
+    p.add_argument("--year",type=int,default=2025); p.add_argument("--out",required=True)
+    p.add_argument("--page-size",type=int,default=1000)
+    a=p.parse_args()
+    base=a.base_url.rstrip("/")+"/"+urllib.parse.quote(a.database)+"/stock_trades.json"
+    where="transaction_date >= :start and transaction_date < :end"
+    params={"_size":a.page_size,"_where":where,"start":f"{a.year}-01-01","end":f"{a.year+1}-01-01",
+            "_shape":"objects","_sort":"transaction_date"}
+    url=base+"?"+urllib.parse.urlencode(params)
+    rows=[]
+    while url:
+        obj=get_json(url)
+        batch=obj.get("rows") or obj.get("results") or []
+        rows.extend(batch)
+        nxt=obj.get("next_url")
+        if not nxt and obj.get("next"):
+            q=dict(params); q["_next"]=obj["next"]; nxt=base+"?"+urllib.parse.urlencode(q)
+        url=nxt
+    out=Path(a.out); out.parent.mkdir(parents=True,exist_ok=True)
+    with out.open("w",newline="",encoding="utf-8") as f:
+        w=csv.DictWriter(f,fieldnames=COLS,extrasaction="ignore");w.writeheader()
+        for r in rows:w.writerow({k:r.get(k,"") for k in COLS})
+    print(f"wrote {len(rows):,} rows to {out}")
+
+if __name__=="__main__":main()
