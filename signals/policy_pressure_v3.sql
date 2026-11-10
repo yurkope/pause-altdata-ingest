@@ -4,11 +4,14 @@
 -- corroboration as a quality dimension.
 --
 -- Design weights:
---   35% allocated financial exposure
---   25% client breadth
---   15% activity breadth
+-- Shadow validation 2026-11-10 selected conservative initial weights:
+--   38% allocated financial exposure
+--   28% client breadth
+--   19% activity breadth
 --   10% filing breadth
---   15% independent-evidence quality
+--    5% independent-evidence quality
+-- Only 3.73% of activity-policy pairs currently have >=2 independent families;
+-- a 15% quality weight caused excessive rank movement (max 7 positions in Q4).
 --
 -- Rationale: money remains the largest component; corroboration improves signal
 -- quality without changing conserved dollar allocation.
@@ -95,11 +98,11 @@ scored AS (
         *,
         ROUND((
             100 * (
-                0.35 * amount_pct +
-                0.25 * clients_pct +
-                0.15 * activities_pct +
+                0.38 * amount_pct +
+                0.28 * clients_pct +
+                0.19 * activities_pct +
                 0.10 * filings_pct +
-                0.15 * corroboration_pct
+                0.05 * corroboration_pct
             )
         )::numeric,1) AS pressure_score_v3
     FROM ranked
