@@ -96,6 +96,16 @@ ranked AS (
 scored AS (
     SELECT
         *,
+        -- Economic pressure excludes evidence quality. It drives longitudinal
+        -- momentum/state so sparse corroboration cannot manufacture a trend.
+        ROUND((
+            100 * (
+                0.40 * amount_pct +
+                0.30 * clients_pct +
+                0.20 * activities_pct +
+                0.10 * filings_pct
+            )
+        )::numeric,1) AS economic_pressure_score,
         ROUND((
             100 * (
                 0.38 * amount_pct +
@@ -115,20 +125,23 @@ lagged AS (
         ) AS prior_quarter_num,
         lag(pressure_score_v3) OVER (
             PARTITION BY policy_code ORDER BY quarter_num
-        ) AS prior_score
+        ) AS prior_quality_adjusted_score,
+        lag(economic_pressure_score) OVER (
+            PARTITION BY policy_code ORDER BY quarter_num
+        ) AS prior_economic_score
     FROM scored s
 )
 SELECT
     *,
     CASE
         WHEN prior_quarter_num = quarter_num - 1
-        THEN ROUND(pressure_score_v3-prior_score,1)
+        THEN ROUND(economic_pressure_score-prior_economic_score,1)
     END AS score_change,
     CASE
         WHEN prior_quarter_num IS NULL
           OR prior_quarter_num <> quarter_num - 1 THEN 'NEW_EMERGING'
-        WHEN pressure_score_v3-prior_score >= 5 THEN 'ACCELERATING'
-        WHEN pressure_score_v3-prior_score <= -5 THEN 'COOLING'
+        WHEN economic_pressure_score-prior_economic_score >= 5 THEN 'ACCELERATING'
+        WHEN economic_pressure_score-prior_economic_score <= -5 THEN 'COOLING'
         ELSE 'PERSISTENT'
     END AS signal_state
 FROM lagged;
