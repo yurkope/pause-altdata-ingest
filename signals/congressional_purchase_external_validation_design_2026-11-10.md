@@ -76,3 +76,47 @@ Then run:
 
 No congressional trade data should be used to train or tune v3 before this external validation is
 locked.
+
+
+## Data-source decision
+
+For the decision-grade test, prefer a full government-derived House + Senate history with
+transaction-level provenance rather than the small feasibility feed.
+
+Candidate research sources verified 2026-11-10:
+- LuxAlgo/market-trackers-data: CC0 full snapshots parsed from Senate eFD + House Clerk, with a
+  primary-source provenance URL on every row and manifest/source-health metadata.
+- DataDawn openregulations-public: government-source stock_trades corpus reporting 46K+ parsed House
+  transactions and 15K+ Senate transactions from 2012-present, with bioguide linkage and source URLs.
+- House Clerk remains the primary source for House coverage auditing.
+
+POC rule: keep raw transaction history off Neon unless a compact derived validation table is later
+justified. Neon is near its storage ceiling.
+
+## Pre-registration / anti-overfit rule
+
+Before running the full correlation:
+1. freeze ticker-policy exposure map;
+2. freeze ownership and transaction filters;
+3. freeze timing windows and primary statistic;
+4. designate all other tests secondary/exploratory.
+
+Primary hypothesis:
+An increase in Quant economic policy pressure is positively associated with the subsequent rate of
+purchases in economically exposed public companies.
+
+Primary independent variable:
+quarter-over-quarter change in economic_pressure_score (or the equivalent v2 economic score for the
+2025 validation period).
+
+Primary outcome:
+unique-member purchase count in exposed tickers during the subsequent quarter.
+
+Primary robustness outcomes:
+raw purchase count and lower-bound disclosed purchase dollars.
+
+Primary test:
+Spearman rank correlation plus a count model; Pearson correlation is descriptive.
+
+This external validation must not be used to tune policy-pressure weights, ticker exposure mappings,
+or evidence-family definitions after results are observed.
