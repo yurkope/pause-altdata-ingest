@@ -401,3 +401,23 @@ Next after Neon reset:
   qualification existed before inference. No production evidence rows were written.
 - The provisional 15% gate remains unmet; do not lower standards to reach it.
 - Artifact: signals/client_specialization_evidence_audit_2026-11-10.md
+
+
+## 2026-11-10 — congressional purchase external validation
+
+- Full 2025 government-derived transaction extract executed through GitHub Actions.
+- 8,810 raw rows; 569 duplicate keys removed; 8,241 unique transactions.
+- House 7,325; Senate 916; 3,984 purchases; 100% source URL coverage; QC PASS.
+- Frozen Tier-1 ticker-policy exposure map was used without post-result changes.
+- Pre-registered primary test FAILED / NULL:
+  - delta policy pressure -> next-quarter unique congressional buyers:
+    Spearman rho -0.066 (p=.740), Pearson r +0.099 (p=.618).
+  - 20,000-draw within-quarter permutation p ~.740.
+- No support for claiming congressional purchases validate Quant in 2025.
+- Secondary normalized next-quarter purchase share was directionally positive but not significant
+  (Spearman +.263, p=.177; Pearson +.313, p=.105).
+- Same-quarter unique-buyer share was exploratory/borderline only (Spearman +.293, p=.060);
+  do not treat as validation.
+- Congressional trades remain external outcomes; no v3 weights or exposure mappings changed.
+- Result artifact: signals/congressional_purchase_external_validation_result_2025.md
+- Execution workflow: .github/workflows/congress-purchase-validation.yml
