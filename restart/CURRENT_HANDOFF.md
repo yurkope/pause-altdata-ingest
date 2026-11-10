@@ -345,3 +345,36 @@ Next after Neon reset:
 2. verify it enters policy.bill/bill_mention correctly;
 3. run provision-policy refinement audit;
 4. evaluate higher-ed taxonomy promotion only after audit.
+
+
+## 2026-11-10 — v3 evidence-independence shadow pipeline
+
+- Neon monthly allowance reset; database responsive at ~936 MB during validation.
+- v3 separates economic exposure from evidence quality.
+- Evidence families are derived rather than persisted.
+- Approved shadow institutional_target mappings:
+  - TRADE_TARIFFS <- USTR / International Trade Administration / CBP
+  - FARM_BILL <- USDA
+  - MEDICAID <- CMS
+- Specificity/control audit passed these narrow mappings; broad agencies remain contextual only.
+- Independent corroboration increased from 3.73% baseline to 9.10% full-population shadow.
+- Quarterly coverage: Q1 7.89%, Q2 8.79%, Q3 9.43%, Q4 10.07%.
+- Dollar allocation reconciles exactly to v2 in every quarter ($0.00 difference).
+- v3 ranking weights: 38% amount, 28% clients, 19% activities, 10% filings, 5% independent evidence.
+- Longitudinal signal_state is NOT based on the quality-adjusted score. It uses the economic
+  40/30/20/10 score so evidence sparsity cannot manufacture momentum transitions.
+- v2-v3 score correlation is ~0.998 each quarter; mean rank movement <=0.69 positions.
+- Q2 top-10 swap: DIGITAL_ASSETS enters (#13 -> #10, 35.6% corroborated);
+  TAX_INTERNATIONAL exits (#10 -> #11, 0% corroborated).
+- Q3 top-10 swap: PERMITTING_NEPA enters (#11 -> #9, 12.0% corroborated);
+  DEFENSE_AUTHORIZATION exits (#10 -> #11, 0% corroborated).
+- Recommendation: keep v2 production baseline; use v3 as standard shadow/research score.
+  Consider promotion after another longitudinal period or a defined evidence-coverage gate
+  (candidate gate: >=15% independent coverage with stable rank/state behavior).
+- Key artifacts:
+  - signals/evidence_independence_v1.md
+  - signals/institutional_target_policy_map_v1.csv
+  - signals/institutional_target_specificity_audit_2026-11-10.md
+  - signals/institutional_target_shadow_validation_2026-11-10.md
+  - signals/policy_v3_longitudinal_shadow_validation_2026-11-10.md
+  - signals/policy_v2_v3_comparison_2026-11-10.md
