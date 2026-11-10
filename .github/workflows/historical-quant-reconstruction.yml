@@ -1,0 +1,56 @@
+name: Historical Quant reconstruction
+
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - '.github/workflows/historical-quant-reconstruction.yml'
+  workflow_dispatch:
+
+jobs:
+  reconstruct-2024:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quant
+          POSTGRES_PASSWORD: quant
+          POSTGRES_DB: quant
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U quant -d quant"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://quant:quant@localhost:5432/quant
+      LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - run: pip install psycopg2-binary requests python-dotenv
+      - name: Verify historical source credential
+        run: test -n "$LDA_API_KEY"
+      - name: Ingest official 2024 LDA filings
+        run: python sources/lda/ingest.py --year 2024
+      - name: Historical source reconciliation
+        run: |
+          psql "$DATABASE_URL" -Atc "
+            SELECT filing_year, filing_period, count(*),
+                   round(sum(coalesce(income,expenses,0))::numeric,2)
+            FROM lda.filing
+            WHERE filing_year=2024
+            GROUP BY filing_year,filing_period
+            ORDER BY filing_period;" | tee historical_lda_2024_reconciliation.csv
+          psql "$DATABASE_URL" -Atc "
+            SELECT 'activities',count(*) FROM lda.activity a
+            JOIN lda.filing f USING(filing_uuid) WHERE f.filing_year=2024
+            UNION ALL SELECT 'filings',count(*) FROM lda.filing WHERE filing_year=2024;" |
+            tee historical_lda_2024_counts.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-lda-2024-reconciliation
+          path: |
+            historical_lda_2024_reconciliation.csv
+            historical_lda_2024_counts.txt
+          retention-days: 30
