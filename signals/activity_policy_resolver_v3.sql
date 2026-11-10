@@ -14,7 +14,17 @@
 -- Storage-light POC design: evidence_family is derived, not persisted in
 -- policy.activity_policy_evidence.
 
-WITH evidence_base AS (
+WITH institutional_target_map(policy_code, entity_pattern) AS (
+    -- Keep synchronized with signals/institutional_target_policy_map_v1.csv.
+    -- Only mappings that passed the 2026-11-10 specificity/control audit belong here.
+    VALUES
+        ('TRADE_TARIFFS','U.S. Trade Representative%'),
+        ('TRADE_TARIFFS','Intl Trade Administration%'),
+        ('TRADE_TARIFFS','U.S. Customs & Border Protection%'),
+        ('FARM_BILL','Agriculture, Dept of%'),
+        ('MEDICAID','Centers For Medicare and Medicaid Services%')
+),
+stored_evidence AS (
     SELECT
         e.activity_id,
         e.policy_code,
@@ -34,9 +44,32 @@ WITH evidence_base AS (
             ELSE 'unknown'
         END AS evidence_family
     FROM policy.activity_policy_evidence e
-    -- Intentionally use the evidence table as the source of truth rather than
-    -- hard-coding classifier versions. New evidence methods must be assigned
-    -- to an evidence family before v3 production promotion.
+),
+institutional_evidence AS (
+    -- Derived shadow evidence: no rows are inserted into activity_policy_evidence.
+    -- Government targets are separately reported LDA fields and therefore can
+    -- provide an independent institutional family when the mapping is specific.
+    SELECT DISTINCT
+        e.activity_id,
+        m.policy_code,
+        'institutional_target'::text AS evidence_method,
+        'institutional-target-v1'::text AS classifier_version,
+        NULL::numeric AS confidence,
+        g.name::text AS evidence_key,
+        'institutional_target'::text AS evidence_family
+    FROM policy.activity_policy_evidence e
+    JOIN institutional_target_map m
+      ON m.policy_code = e.policy_code
+    JOIN lda.activity_government_entity age
+      ON age.activity_id = e.activity_id
+    JOIN lda.government_entity g
+      ON g.government_entity_id = age.government_entity_id
+    WHERE g.name LIKE m.entity_pattern
+),
+evidence_base AS (
+    SELECT * FROM stored_evidence
+    UNION ALL
+    SELECT * FROM institutional_evidence
 ),
 unknown_guard AS (
     -- Kept as a CTE so audit SQL can assert this count is zero.
