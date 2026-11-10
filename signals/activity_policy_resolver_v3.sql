@@ -22,7 +22,21 @@ WITH institutional_target_map(policy_code, entity_pattern) AS (
         ('TRADE_TARIFFS','Intl Trade Administration%'),
         ('TRADE_TARIFFS','U.S. Customs & Border Protection%'),
         ('FARM_BILL','Agriculture, Dept of%'),
-        ('MEDICAID','Centers For Medicare and Medicaid Services%')
+        ('MEDICAID','Centers For Medicare and Medicaid Services%'),
+        ('RAIL_SAFETY','Federal Railroad Administration'),
+        ('AUTONOMOUS_VEHICLES','Natl Highway Traffic Safety Administration (NHTSA)'),
+        ('BANK_CAPITAL','Federal Reserve System'),
+        ('PATENT_POLICY','Patent & Trademark Office (PTO)'),
+        ('BROADBAND_BEAD','Natl Telecommunications & Information Administration (NTIA)'),
+        ('EXPORT_CONTROLS','Bureau of Industry and Security (BIS)'),
+        ('FAA_AVIATION','Federal Aviation Administration (FAA)'),
+        ('FOREST_WILDFIRE','U.S. Forest Service'),
+        ('DIGITAL_ASSETS','Commodity Futures Trading Commission (CFTC)'),
+        ('DIGITAL_ASSETS','Securities & Exchange Commission (SEC)'),
+        ('WATER_INFRASTRUCTURE','Bureau of Reclamation'),
+        ('TELEHEALTH','Substance Abuse & Mental Health Services Administration (SAMHSA)'),
+        ('PERMITTING_NEPA','Council on Environmental Quality (CEQ)'),
+        ('AI_POLICY','Office of Science & Technology Policy (OSTP)')
 ),
 stored_evidence AS (
     SELECT
