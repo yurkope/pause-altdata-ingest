@@ -5,6 +5,7 @@ on:
     branches: [vibe-lda-ingestion]
     paths:
       - '.github/workflows/congress-purchase-validation.yml'
+      - 'signals/fetch_congress_stock_trades.py'
   workflow_dispatch:
 
 jobs:
