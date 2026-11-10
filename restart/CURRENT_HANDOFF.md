@@ -378,3 +378,26 @@ Next after Neon reset:
   - signals/institutional_target_shadow_validation_2026-11-10.md
   - signals/policy_v3_longitudinal_shadow_validation_2026-11-10.md
   - signals/policy_v2_v3_comparison_2026-11-10.md
+
+
+## 2026-11-10 — independent evidence expansion after 10.91%
+
+- Committee convergence was audited and rejected as a new independent family because the current
+  chain is activity -> bill mention -> bill -> committee; it remains contextual/convergence evidence.
+- Temporally stable institutional_target expansion increased clean independent coverage to
+  10,692 / 98,046 = 10.91%.
+- Client specialization was tested as a separate behavioral/history family.
+- Point-in-time candidate rule: prior quarters only, >=3 historical observations, unique dominant
+  policy, >=80% historical share.
+- Raw next-quarter precision: Q2 88.16%, Q3 89.03%, Q4 92.17%.
+- Blanket client specialization is rejected because some policies fail badly.
+- Policy-qualified walk-forward rule:
+  - Q3 policies qualified from Q2 holdout only: 93.27% precision (1,579/1,693).
+  - Q4 policies qualified from Q2+Q3 holdouts: 95.09% precision (2,612/2,747).
+- Retrospective coverage potential with the qualified set is 13.83% (+2,868 pairs over 10.91%),
+  but this is NOT a production/historical coverage claim because Q1 has no history and Q2 lacks a
+  prior policy-level holdout.
+- Client specialization is approved as a promising SHADOW evidence-family concept only when
+  qualification existed before inference. No production evidence rows were written.
+- The provisional 15% gate remains unmet; do not lower standards to reach it.
+- Artifact: signals/client_specialization_evidence_audit_2026-11-10.md
