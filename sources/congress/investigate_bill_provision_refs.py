@@ -20,7 +20,7 @@ import requests,psycopg2
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
-from reference_normalization import normalize_section_token
+try:\n    from sources.congress.reference_normalization import normalize_section_token\nexcept ModuleNotFoundError:\n    from reference_normalization import normalize_section_token
 
 BASE="https://api.congress.gov/v3"
 SEC_RE=re.compile(r"(?im)^\s*(?:SEC\.|SECTION)\s+([0-9]+[A-Za-z0-9().-]*)[.\s-]+(.{0,240})$")
