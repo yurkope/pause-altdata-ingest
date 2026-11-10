@@ -11,7 +11,7 @@ import requests
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from reference_normalization import section_root
+try:\n    from sources.congress.reference_normalization import section_root\nexcept ModuleNotFoundError:\n    from reference_normalization import section_root
 
 BASE="https://api.congress.gov/v3"
 EXPLICIT_CONGRESS_RE=re.compile(r"(?i)\b(?P<congress>\d{3})(?:st|nd|rd|th)\s+Congress\b")
