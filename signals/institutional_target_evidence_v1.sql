@@ -44,6 +44,6 @@ WITH expected(policy_code, entity_pattern) AS (
  JOIN expected x USING(policy_code)
  JOIN lda.activity_government_entity age USING(activity_id)
  JOIN lda.government_entity g USING(government_entity_id)
-   ON g.name LIKE x.entity_pattern
+ WHERE g.name LIKE x.entity_pattern
 )
 SELECT * FROM candidate;
