@@ -29,16 +29,30 @@ def main():
     a=p.parse_args()
     base=a.base_url.rstrip("/")+"/"+urllib.parse.quote(a.database)+".json"
     select="member_name,bioguide_id,chamber,transaction_date,ticker,asset_description,transaction_type,amount_range,owner,source_url"
-    sql=(f"SELECT {select} FROM stock_trades "
-         f"WHERE transaction_date >= '{a.year}-01-01' "
-         f"AND transaction_date < '{a.year+1}-01-01' "
-         "ORDER BY transaction_date, member_name, ticker")
-    url=base+"?"+urllib.parse.urlencode({"sql":sql,"_shape":"objects"})
-    obj=get_json(url)
-    rows=obj.get("rows") or obj.get("results") or []
-    if rows and isinstance(rows[0],list):
-        cols=obj.get("columns") or COLS[:-1]
-        rows=[dict(zip(cols,r)) for r in rows]
+    rows=[]; offset=0
+    while True:
+        sql=(f"SELECT {select} FROM stock_trades "
+             f"WHERE transaction_date >= '{a.year}-01-01' "
+             f"AND transaction_date < '{a.year+1}-01-01' "
+             "ORDER BY transaction_date, member_name, ticker, source_url, rowid "
+             f"LIMIT {a.page_size} OFFSET {offset}")
+        url=base+"?"+urllib.parse.urlencode({"sql":sql,"_shape":"objects"})
+        obj=get_json(url); batch=obj.get("rows") or obj.get("results") or []
+        if batch and isinstance(batch[0],list):
+            cols=obj.get("columns") or COLS[:-1]
+            batch=[dict(zip(cols,r)) for r in batch]
+        rows.extend(batch)
+        if len(batch)<a.page_size: break
+        offset+=a.page_size
+    dedup=[]; seen=set()
+    for r in rows:
+        key=(r.get("source_url",""),r.get("member_name",""),r.get("ticker",""),
+             r.get("transaction_date",""),r.get("transaction_type",""),r.get("owner",""),
+             r.get("amount_range",""))
+        if key in seen: continue
+        seen.add(key); dedup.append(r)
+    print(f"raw rows: {len(rows):,}; duplicate keys removed: {len(rows)-len(dedup):,}")
+    rows=dedup
     out=Path(a.out); out.parent.mkdir(parents=True,exist_ok=True)
     with out.open("w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=COLS,extrasaction="ignore");w.writeheader()
