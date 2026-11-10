@@ -27,20 +27,18 @@ def main():
     p.add_argument("--year",type=int,default=2025); p.add_argument("--out",required=True)
     p.add_argument("--page-size",type=int,default=1000)
     a=p.parse_args()
-    base=a.base_url.rstrip("/")+"/"+urllib.parse.quote(a.database)+"/stock_trades.json"
-    where="transaction_date >= :start and transaction_date < :end"
-    params={"_size":a.page_size,"_where":where,"start":f"{a.year}-01-01","end":f"{a.year+1}-01-01",
-            "_shape":"objects","_sort":"transaction_date"}
-    url=base+"?"+urllib.parse.urlencode(params)
-    rows=[]
-    while url:
-        obj=get_json(url)
-        batch=obj.get("rows") or obj.get("results") or []
-        rows.extend(batch)
-        nxt=obj.get("next_url")
-        if not nxt and obj.get("next"):
-            q=dict(params); q["_next"]=obj["next"]; nxt=base+"?"+urllib.parse.urlencode(q)
-        url=nxt
+    base=a.base_url.rstrip("/")+"/"+urllib.parse.quote(a.database)+".json"
+    select="member_name,bioguide_id,chamber,transaction_date,ticker,asset_description,transaction_type,amount_range,owner,source_url"
+    sql=(f"SELECT {select} FROM stock_trades "
+         f"WHERE transaction_date >= '{a.year}-01-01' "
+         f"AND transaction_date < '{a.year+1}-01-01' "
+         "ORDER BY transaction_date, member_name, ticker")
+    url=base+"?"+urllib.parse.urlencode({"sql":sql,"_shape":"objects"})
+    obj=get_json(url)
+    rows=obj.get("rows") or obj.get("results") or []
+    if rows and isinstance(rows[0],list):
+        cols=obj.get("columns") or COLS[:-1]
+        rows=[dict(zip(cols,r)) for r in rows]
     out=Path(a.out); out.parent.mkdir(parents=True,exist_ok=True)
     with out.open("w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=COLS,extrasaction="ignore");w.writeheader()
