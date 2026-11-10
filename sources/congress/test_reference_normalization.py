@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from reference_normalization import normalize_section_token,section_root
+from sources.congress.reference_normalization import normalize_section_token,section_root
 
 def test_heading_suffix_is_not_swallowed():
     assert normalize_section_token("section 4-water quality technology availability")=="4"
