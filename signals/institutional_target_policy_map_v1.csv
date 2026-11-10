@@ -1,0 +1,6 @@
+mapping_version,policy_code,entity_pattern,evidence_family,status,precision_q4_2025,recall_q4_2025,lift_q4_2025,notes
+institutional-target-v1,TRADE_TARIFFS,U.S. Trade Representative%,institutional_target,SHADOW_APPROVED,0.490,0.385,12.02,USTR specificity audit
+institutional-target-v1,TRADE_TARIFFS,Intl Trade Administration%,institutional_target,SHADOW_APPROVED,0.446,0.025,10.94,ITA specificity audit
+institutional-target-v1,TRADE_TARIFFS,U.S. Customs & Border Protection%,institutional_target,SHADOW_APPROVED,0.270,0.030,6.62,CBP specificity audit
+institutional-target-v1,FARM_BILL,Agriculture; Dept of%,institutional_target,SHADOW_APPROVED,0.195,0.605,14.60,USDA high lift and recall; broad institution so shadow only
+institutional-target-v1,MEDICAID,Centers For Medicare and Medicaid Services%,institutional_target,SHADOW_APPROVED,0.241,0.308,9.66,CMS specificity audit
