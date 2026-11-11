@@ -33,6 +33,18 @@ jobs:
         run: test -n "$LDA_API_KEY"
       - name: Ingest official 2024 LDA filings
         run: python sources/lda/ingest.py --year 2024
+      - name: Resolve frozen 118th-Congress bill-policy evidence
+        run: |
+          python signals/resolve_historical_bill_policy_evidence.py \
+            --year 2024 --congress 118 \
+            --output historical_bill_policy_evidence_2024.csv
+      - name: Score historical Quant 2024
+        run: |
+          python signals/score_historical_quant.py \
+            --year 2024 \
+            --bill-evidence historical_bill_policy_evidence_2024.csv \
+            --output historical_quant_pressure_2024.csv \
+            --audit-output historical_quant_audit_2024.csv
       - name: Historical source reconciliation
         run: |
           psql "$DATABASE_URL" -Atc "
@@ -53,4 +65,7 @@ jobs:
           path: |
             historical_lda_2024_reconciliation.csv
             historical_lda_2024_counts.txt
+            historical_bill_policy_evidence_2024.csv
+            historical_quant_pressure_2024.csv
+            historical_quant_audit_2024.csv
           retention-days: 30
