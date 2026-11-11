@@ -139,7 +139,7 @@ FROM lagged ORDER BY quarter_num,economic_pressure_score DESC
 )
 SELECT (SELECT count(*) FROM labels) regex_evidence_rows,
        (SELECT count(*) FROM hist_bill_evidence) bill_evidence_rows,
-       (SELECT count(DISTINCT activity_id||':'||policy_code) FROM ev) activity_policy_pairs,
+       (SELECT count(DISTINCT activity_id::text||':'||policy_code) FROM ev) activity_policy_pairs,
        (SELECT count(DISTINCT filing_uuid) FROM alloc) allocated_filings,
        (SELECT count(*) FROM chk WHERE abs(disclosed-allocated)>.01) conservation_violations,
        (SELECT coalesce(max(abs(disclosed-allocated)),0) FROM chk) max_abs_diff,
