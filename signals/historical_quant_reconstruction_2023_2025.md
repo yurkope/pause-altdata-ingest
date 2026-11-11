@@ -58,3 +58,22 @@ test.
 
 2024 first, then 2023. 2024 provides the nearest-period comparability check to 2025 before extending
 farther back.
+
+
+## Pre-outcome 2025 replay acceptance gate
+
+Frozen before inspecting any 2024 congressional-trade outcome.
+
+The historical-safe classifier/replay is accepted for external validation only if its 2025 replay, compared with production policy_pressure_v2, satisfies all of the following:
+- Spearman rank correlation of quarterly economic pressure >= 0.95 across overlapping substantive policy-quarter cells;
+- mean absolute economic-pressure score difference <= 5.0 points;
+- quarterly top-10 policy overlap >= 80% in every quarter;
+- filing-policy allocation conserves each eligible filing to <= $0.01;
+- no duplicate activity-policy or filing-policy pairs;
+- the replay uses the same 40/30/20/10 economic score weights and within-quarter percent-rank normalization as production v2.
+
+Failure of any gate means 2024 congressional outcomes remain withheld from model tuning. The replay must be repaired from source/model evidence only, or the historical test must be reported as non-comparable.
+
+### Historical-safe evidence rule
+
+Primary historical reconstruction excludes any semantic/AI evidence that can incorporate post-period knowledge. Congress-specific bill anchors may be used only when the corresponding historical Congress bill corpus and frozen mapping are reproducibly available. A deterministic activity-text baseline will be replayed on 2025 first to quantify how much production v2 behavior it recovers before it is allowed to score 2024/2023.
