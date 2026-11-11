@@ -69,3 +69,4 @@ jobs:
             historical_quant_pressure_2024.csv
             historical_quant_audit_2024.csv
           retention-days: 30
+          # manual restart marker: 2026-11-11
