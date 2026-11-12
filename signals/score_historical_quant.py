@@ -43,7 +43,7 @@ def main():
         cur.execute("CREATE TEMP TABLE hist_policy_meta(policy_code text primary key,allocation_role text,parent_policy_code text)")
         execute_values(cur,"INSERT INTO hist_policy_meta VALUES %s",meta)
         sql=prefix+""",
-, ev AS (
+ev AS (
   SELECT DISTINCT activity_id,label AS policy_code,'activity_regex'::text evidence_method FROM labels
   UNION
   SELECT DISTINCT activity_id,policy_code,'bill_anchor'::text FROM hist_bill_evidence
@@ -116,7 +116,7 @@ FROM lagged ORDER BY quarter_num,economic_pressure_score DESC
         with open(args.output,"w",newline="",encoding="utf-8") as fh:
             w=csv.writer(fh);w.writerow(cols);w.writerows(scores)
         audit_sql=prefix+""",
-, ev AS (
+ev AS (
  SELECT DISTINCT activity_id,label policy_code FROM labels
  UNION SELECT DISTINCT activity_id,policy_code FROM hist_bill_evidence
 ), enriched AS (
