@@ -103,7 +103,7 @@ ev AS (
     lag(economic_pressure_score) OVER(PARTITION BY policy_code ORDER BY quarter_num) prior_score
   FROM scored s
 )
-SELECT policy_code,%s year,quarter_num,round(allocated_amount,2),clients,activities,filings,economic_pressure_score,
+SELECT policy_code,%s AS reconstruction_year,quarter_num,round(allocated_amount,2),clients,activities,filings,economic_pressure_score,
  CASE WHEN prior_quarter_num=quarter_num-1 THEN round(economic_pressure_score-prior_score,1) END score_change,
  CASE WHEN prior_quarter_num IS NULL OR prior_quarter_num<>quarter_num-1 THEN 'NEW_EMERGING'
       WHEN economic_pressure_score-prior_score>=5 THEN 'ACCELERATING'
