@@ -39,7 +39,9 @@ jobs:
       - name: Ingest official 2024 LDA filings
         run: python sources/lda/ingest.py --year 2024
       - name: Snapshot ingested 2024 LDA database
-        run: pg_dump "$DATABASE_URL" --format=custom --compress=9 --file=historical_lda_2024.dump
+        run: |
+          docker exec ${{ job.services.postgres.id }} pg_dump -U quant -d quant --format=custom --compress=9 > historical_lda_2024.dump
+          test -s historical_lda_2024.dump
       - name: Upload reusable 2024 LDA snapshot
         uses: actions/upload-artifact@v4
         with:
