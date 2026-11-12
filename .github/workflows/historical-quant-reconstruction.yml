@@ -34,7 +34,8 @@ jobs:
       - name: Smoke-test historical reconstruction code
         run: |
           python -m py_compile signals/resolve_historical_bill_policy_evidence.py signals/score_historical_quant.py
-          python -c "import signals.resolve_historical_bill_policy_evidence; import signals.score_historical_quant"
+          python -c "import signals.resolve_historical_bill_policy_evidence as r; import signals.score_historical_quant as s; assert callable(r.main) and callable(s.main)"
+          grep -q 'if __name__=="__main__": main()' signals/resolve_historical_bill_policy_evidence.py
       - name: Ingest official 2024 LDA filings
         run: python sources/lda/ingest.py --year 2024
       - name: Resolve frozen 118th-Congress bill-policy evidence
@@ -42,6 +43,8 @@ jobs:
           python signals/resolve_historical_bill_policy_evidence.py \
             --year 2024 --congress 118 \
             --output historical_bill_policy_evidence_2024.csv
+          test -s historical_bill_policy_evidence_2024.csv
+          head -1 historical_bill_policy_evidence_2024.csv | grep -q "activity_id,policy_code,confidence"
       - name: Score historical Quant 2024
         run: |
           python signals/score_historical_quant.py \
