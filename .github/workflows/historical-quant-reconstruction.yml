@@ -38,6 +38,14 @@ jobs:
           grep -q 'if __name__=="__main__": main()' signals/resolve_historical_bill_policy_evidence.py
       - name: Ingest official 2024 LDA filings
         run: python sources/lda/ingest.py --year 2024
+      - name: Snapshot ingested 2024 LDA database
+        run: pg_dump "$DATABASE_URL" --format=custom --compress=9 --file=historical_lda_2024.dump
+      - name: Upload reusable 2024 LDA snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-lda-2024-db-snapshot
+          path: historical_lda_2024.dump
+          retention-days: 30
       - name: Resolve frozen 118th-Congress bill-policy evidence
         run: |
           python signals/resolve_historical_bill_policy_evidence.py \
