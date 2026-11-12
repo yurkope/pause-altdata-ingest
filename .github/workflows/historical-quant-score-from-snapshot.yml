@@ -1,0 +1,57 @@
+name: Historical Quant score from cached 2024 snapshot
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - 'signals/score_historical_quant.py'
+      - 'signals/resolve_historical_bill_policy_evidence.py'
+      - 'signals/bill_policy_118_manifest_v1.csv'
+      - '.github/workflows/historical-quant-score-from-snapshot.yml'
+  workflow_dispatch:
+jobs:
+  score-2024:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: {POSTGRES_USER: quant, POSTGRES_PASSWORD: quant, POSTGRES_DB: quant}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U quant -d quant"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://quant:quant@localhost:5432/quant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - run: pip install psycopg2-binary requests python-dotenv
+      - name: Download frozen 2024 LDA snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2024-db-snapshot
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: yurkope/pause-altdata-ingest
+          run-id: 43155997811
+      - name: Restore 2024 LDA snapshot with PostgreSQL 17
+        run: |
+          test -s historical_lda_2024.dump
+          cat historical_lda_2024.dump | docker exec -i ${{ job.services.postgres.id }} pg_restore -U quant -d quant --clean --if-exists
+          test "$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM lda.filing WHERE filing_year=2024")" = "96963"
+      - name: Resolve frozen 118th-Congress bill-policy evidence
+        run: |
+          python signals/resolve_historical_bill_policy_evidence.py --year 2024 --congress 118 --output historical_bill_policy_evidence_2024.csv
+          test -s historical_bill_policy_evidence_2024.csv
+      - name: Score historical Quant 2024
+        run: python signals/score_historical_quant.py --year 2024 --bill-evidence historical_bill_policy_evidence_2024.csv --output historical_quant_pressure_2024.csv --audit-output historical_quant_audit_2024.csv
+      - name: Reconcile cached historical source
+        run: psql "$DATABASE_URL" -Atc "SELECT filing_year,filing_period,count(*),round(sum(coalesce(income,expenses,0))::numeric,2) FROM lda.filing WHERE filing_year=2024 GROUP BY filing_year,filing_period ORDER BY filing_period;" | tee historical_lda_2024_reconciliation.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-quant-2024-scored
+          path: |
+            historical_bill_policy_evidence_2024.csv
+            historical_quant_pressure_2024.csv
+            historical_quant_audit_2024.csv
+            historical_lda_2024_reconciliation.csv
+          retention-days: 30

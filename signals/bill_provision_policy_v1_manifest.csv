@@ -1,0 +1,11 @@
+congress,bill_type,bill_number,section_ref,policy_code,mapping_basis,status
+119,HR,1,71112,MEDICAID,"activity text: retroactive coverage / Medicaid",DETERMINISTIC
+119,HR,1,71115,MEDICAID,"activity text: Medicaid provider taxes / Medicaid financing",DETERMINISTIC
+119,HR,1,71116,MEDICAID,"activity text: state directed payments / Medicaid financing",DETERMINISTIC
+119,HR,1,70415,TAX_BUSINESS_INNOVATION,"activity text: excise tax on investment income of private colleges/universities; existing taxonomy lacks a narrower substantive higher-education tax code",DETERMINISTIC_PARENT
+119,HR,1,83001,HIGHER_ED_FINANCIAL_AID,"Pell Grant eligibility; maps to higher-education financial-aid parent rather than loan-specific child",DETERMINISTIC
+119,HR,1,112022,TAX_CORPORATE,"private foundation investment income tax; TAX_CORPORATE also independently observed",DETERMINISTIC
+119,HR,1,112025,TAX_BUSINESS_INNOVATION,"activity text explicitly identifies UBIT provision; existing taxonomy lacks nonprofit/UBIT substantive code",DETERMINISTIC_PARENT
+119,HR,1,112032,TRADE_TARIFFS,"duty drawback on substituted merchandise; trade and customs tax treatment",DETERMINISTIC
+119,HR,5878,7,HOUSING,"HOME Reform Act; section 7 concerns HOME Investment Trust Funds",DETERMINISTIC
+119,HR,5039,2,RIGHT_TO_REPAIR,"Wheelchair Right to Repair Act; activity text identifies section 2 circumvention exemption",DETERMINISTIC

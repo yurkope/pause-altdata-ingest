@@ -1,0 +1,89 @@
+name: Historical Quant reconstruction
+
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - '.github/workflows/historical-quant-reconstruction.yml'
+  workflow_dispatch:
+
+jobs:
+  reconstruct-2024:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quant
+          POSTGRES_PASSWORD: quant
+          POSTGRES_DB: quant
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U quant -d quant"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://quant:quant@localhost:5432/quant
+      LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - run: pip install psycopg2-binary requests python-dotenv
+      - name: Verify historical source credential
+        run: test -n "$LDA_API_KEY"
+      - name: Smoke-test historical reconstruction code
+        run: |
+          python -m py_compile signals/resolve_historical_bill_policy_evidence.py signals/score_historical_quant.py
+          python -c "import signals.resolve_historical_bill_policy_evidence as r; import signals.score_historical_quant as s; assert callable(r.main) and callable(s.main)"
+          grep -q 'if __name__=="__main__": main()' signals/resolve_historical_bill_policy_evidence.py
+      - name: Ingest official 2024 LDA filings
+        run: python sources/lda/ingest.py --year 2024
+      - name: Snapshot ingested 2024 LDA database
+        run: |
+          docker exec ${{ job.services.postgres.id }} pg_dump -U quant -d quant --format=custom --compress=9 > historical_lda_2024.dump
+          test -s historical_lda_2024.dump
+      - name: Upload reusable 2024 LDA snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-lda-2024-db-snapshot
+          path: historical_lda_2024.dump
+          retention-days: 30
+      - name: Resolve frozen 118th-Congress bill-policy evidence
+        run: |
+          python signals/resolve_historical_bill_policy_evidence.py \
+            --year 2024 --congress 118 \
+            --output historical_bill_policy_evidence_2024.csv
+          test -s historical_bill_policy_evidence_2024.csv
+          head -1 historical_bill_policy_evidence_2024.csv | grep -q "activity_id,policy_code,confidence"
+      - name: Score historical Quant 2024
+        run: |
+          python signals/score_historical_quant.py \
+            --year 2024 \
+            --bill-evidence historical_bill_policy_evidence_2024.csv \
+            --output historical_quant_pressure_2024.csv \
+            --audit-output historical_quant_audit_2024.csv
+      - name: Historical source reconciliation
+        run: |
+          psql "$DATABASE_URL" -Atc "
+            SELECT filing_year, filing_period, count(*),
+                   round(sum(coalesce(income,expenses,0))::numeric,2)
+            FROM lda.filing
+            WHERE filing_year=2024
+            GROUP BY filing_year,filing_period
+            ORDER BY filing_period;" | tee historical_lda_2024_reconciliation.csv
+          psql "$DATABASE_URL" -Atc "
+            SELECT 'activities',count(*) FROM lda.activity a
+            JOIN lda.filing f USING(filing_uuid) WHERE f.filing_year=2024
+            UNION ALL SELECT 'filings',count(*) FROM lda.filing WHERE filing_year=2024;" |
+            tee historical_lda_2024_counts.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-lda-2024-reconciliation
+          path: |
+            historical_lda_2024_reconciliation.csv
+            historical_lda_2024_counts.txt
+            historical_bill_policy_evidence_2024.csv
+            historical_quant_pressure_2024.csv
+            historical_quant_audit_2024.csv
+          retention-days: 30
+          # manual restart marker: 2026-11-11

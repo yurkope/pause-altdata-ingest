@@ -1,0 +1,35 @@
+-- Bill-provision policy bridge v1 — STORAGE-LIGHT POC DESIGN.
+--
+-- IMPORTANT ARCHITECTURE DECISION (2026-10-29):
+-- Provision attribution is a REFINEMENT of bill/activity policy attribution, not an
+-- independent corroborating evidence family. The production resolver currently defines
+-- corroborated as COUNT(DISTINCT evidence_method) > 1. Therefore inserting a
+-- 'bill_provision' evidence_method would create false corroboration when the provision
+-- merely refines the same bill anchor.
+--
+-- This file intentionally performs NO production schema changes and NO durable inserts.
+-- Use signals/bill_provision_policy_v1_manifest.csv as the controlled mapping artifact.
+-- Use sources/congress/audit_bill_provision_policy_bridge.py for read-only impact audit.
+--
+-- Promotion design, if later justified:
+--   1. join validated provision observations to the controlled provision manifest;
+--   2. use the provision mapping to refine/replace broad activity-policy attribution
+--      where it adds specificity;
+--   3. do NOT count bill_anchor + bill_provision as two independent methods;
+--   4. preserve filing-dollar conservation;
+--   5. test on a Neon migration/temp branch before any production change.
+--
+-- Fully validated provision statuses eligible for mapping:
+--   VALIDATED_BILL_PROVISION_CURRENT
+--   VALIDATED_BILL_PROVISION_HISTORICAL
+--
+-- Explicitly not eligible:
+--   REJECTED_BILL_PROVISION_CANDIDATE
+--   UNDERLYING_AUTHORITY_SECTION
+--   OFFICIAL_TEXT_AMENDS_UNDERLYING_AUTHORITY
+--   SECTION_ROOT_EXISTS_SUBSECTION_UNVERIFIED
+--
+-- Omnibus rule:
+-- Focused bills may use bill-level canonical mappings.
+-- Mega/omnibus bills (notably 119th H.R.1) must use bill + section mappings rather
+-- than inheriting one substantive policy across the entire bill.
