@@ -38,3 +38,4 @@ jobs:
             /tmp/quant_investment_backtest_summary.csv
             /tmp/backtest.log
           retention-days: 30
+# point-in-time rerun: LDA quarter-end + 20 days
