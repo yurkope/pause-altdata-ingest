@@ -1,0 +1,85 @@
+name: Historical Quant reconstruction
+
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - '.github/workflows/historical-quant-reconstruction.yml'
+  workflow_dispatch:
+
+jobs:
+  reconstruct-2022-activity-text-only:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quant
+          POSTGRES_PASSWORD: quant
+          POSTGRES_DB: quant
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U quant -d quant"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://quant:quant@localhost:5432/quant
+      LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - run: pip install psycopg2-binary requests python-dotenv
+      - name: Verify historical source credential
+        run: test -n "$LDA_API_KEY"
+      - name: Smoke-test historical reconstruction code
+        run: |
+          python -m py_compile signals/resolve_historical_bill_policy_evidence.py signals/score_historical_quant.py
+          python -c "import signals.resolve_historical_bill_policy_evidence as r; import signals.score_historical_quant as s; assert callable(r.main) and callable(s.main)"
+          grep -q 'if __name__=="__main__": main()' signals/resolve_historical_bill_policy_evidence.py
+      - name: Ingest official 2022 LDA filings
+        run: python sources/lda/ingest.py --year 2022
+      - name: Snapshot ingested 2022 LDA database
+        run: |
+          docker exec ${{ job.services.postgres.id }} pg_dump -U quant -d quant --format=custom --compress=9 > historical_lda_2022.dump
+          test -s historical_lda_2022.dump
+      - name: Upload reusable 2022 LDA snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-lda-2022-db-snapshot
+          path: historical_lda_2022.dump
+          retention-days: 30
+      - name: Create intentionally empty bill evidence
+        run: |
+          echo 'activity_id,policy_code,confidence,source_congress,source_bill_type,source_bill_number,resolution_method,evidence,evidence_context' > historical_bill_policy_evidence_2022.csv
+      - name: Score historical Quant 2022 activity-text-only
+        run: |
+          python signals/score_historical_quant.py \
+            --year 2022 \
+            --bill-evidence historical_bill_policy_evidence_2022.csv \
+            --output historical_quant_pressure_2022.csv \
+            --audit-output historical_quant_audit_2022.csv
+      - name: Historical source reconciliation
+        run: |
+          psql "$DATABASE_URL" -Atc "
+            SELECT filing_year, filing_period, count(*),
+                   round(sum(coalesce(income,expenses,0))::numeric,2)
+            FROM lda.filing
+            WHERE filing_year=2022
+            GROUP BY filing_year,filing_period
+            ORDER BY filing_period;" | tee historical_lda_2022_reconciliation.csv
+          psql "$DATABASE_URL" -Atc "
+            SELECT 'activities',count(*) FROM lda.activity a
+            JOIN lda.filing f USING(filing_uuid) WHERE f.filing_year=2022
+            UNION ALL SELECT 'filings',count(*) FROM lda.filing WHERE filing_year=2022;" |
+            tee historical_lda_2022_counts.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-lda-2022-reconciliation
+          path: |
+            historical_lda_2022_reconciliation.csv
+            historical_lda_2022_counts.txt
+            historical_bill_policy_evidence_2022.csv
+            historical_quant_pressure_2022.csv
+            historical_quant_audit_2022.csv
+          retention-days: 30
+          # manual restart marker: 2026-11-11
