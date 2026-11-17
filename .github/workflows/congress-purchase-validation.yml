@@ -15,26 +15,26 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch 2025 congressional trades
+      - name: Fetch 2024 congressional trades
         run: |
           python signals/fetch_congress_stock_trades.py \
             --base-url https://regs.datadawn.org \
             --database openregs \
-            --year 2025 \
-            --out /tmp/congress_stock_trades_2025.csv
+            --year 2024 \
+            --out /tmp/congress_stock_trades_2024.csv
       - name: QC extract
-        run: python signals/audit_congress_stock_trade_extract.py /tmp/congress_stock_trades_2025.csv --year 2025
+        run: python signals/audit_congress_stock_trade_extract.py /tmp/congress_stock_trades_2024.csv --year 2024
       - name: Build frozen policy purchase panel
         run: |
           python signals/build_congress_purchase_validation_panel.py \
-            --trades /tmp/congress_stock_trades_2025.csv \
+            --trades /tmp/congress_stock_trades_2024.csv \
             --exposure-map signals/congress_trade_policy_exposure_map_v1.csv \
-            --year 2025 \
-            --out /tmp/congress_policy_purchase_panel_2025.csv
+            --year 2024 \
+            --out /tmp/congress_policy_purchase_panel_2024.csv
       - uses: actions/upload-artifact@v4
         with:
-          name: congress-purchase-validation-2025
+          name: congress-purchase-validation-2024
           path: |
-            /tmp/congress_stock_trades_2025.csv
-            /tmp/congress_policy_purchase_panel_2025.csv
+            /tmp/congress_stock_trades_2024.csv
+            /tmp/congress_policy_purchase_panel_2024.csv
           retention-days: 30
