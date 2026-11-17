@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  reconstruct-2024:
+  reconstruct-2023:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -36,54 +36,54 @@ jobs:
           python -m py_compile signals/resolve_historical_bill_policy_evidence.py signals/score_historical_quant.py
           python -c "import signals.resolve_historical_bill_policy_evidence as r; import signals.score_historical_quant as s; assert callable(r.main) and callable(s.main)"
           grep -q 'if __name__=="__main__": main()' signals/resolve_historical_bill_policy_evidence.py
-      - name: Ingest official 2024 LDA filings
-        run: python sources/lda/ingest.py --year 2024
-      - name: Snapshot ingested 2024 LDA database
+      - name: Ingest official 2023 LDA filings
+        run: python sources/lda/ingest.py --year 2023
+      - name: Snapshot ingested 2023 LDA database
         run: |
-          docker exec ${{ job.services.postgres.id }} pg_dump -U quant -d quant --format=custom --compress=9 > historical_lda_2024.dump
-          test -s historical_lda_2024.dump
-      - name: Upload reusable 2024 LDA snapshot
+          docker exec ${{ job.services.postgres.id }} pg_dump -U quant -d quant --format=custom --compress=9 > historical_lda_2023.dump
+          test -s historical_lda_2023.dump
+      - name: Upload reusable 2023 LDA snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: historical-lda-2024-db-snapshot
-          path: historical_lda_2024.dump
+          name: historical-lda-2023-db-snapshot
+          path: historical_lda_2023.dump
           retention-days: 30
       - name: Resolve frozen 118th-Congress bill-policy evidence
         run: |
           python signals/resolve_historical_bill_policy_evidence.py \
-            --year 2024 --congress 118 \
-            --output historical_bill_policy_evidence_2024.csv
-          test -s historical_bill_policy_evidence_2024.csv
-          head -1 historical_bill_policy_evidence_2024.csv | grep -q "activity_id,policy_code,confidence"
-      - name: Score historical Quant 2024
+            --year 2023 --congress 118 \
+            --output historical_bill_policy_evidence_2023.csv
+          test -s historical_bill_policy_evidence_2023.csv
+          head -1 historical_bill_policy_evidence_2023.csv | grep -q "activity_id,policy_code,confidence"
+      - name: Score historical Quant 2023
         run: |
           python signals/score_historical_quant.py \
-            --year 2024 \
-            --bill-evidence historical_bill_policy_evidence_2024.csv \
-            --output historical_quant_pressure_2024.csv \
-            --audit-output historical_quant_audit_2024.csv
+            --year 2023 \
+            --bill-evidence historical_bill_policy_evidence_2023.csv \
+            --output historical_quant_pressure_2023.csv \
+            --audit-output historical_quant_audit_2023.csv
       - name: Historical source reconciliation
         run: |
           psql "$DATABASE_URL" -Atc "
             SELECT filing_year, filing_period, count(*),
                    round(sum(coalesce(income,expenses,0))::numeric,2)
             FROM lda.filing
-            WHERE filing_year=2024
+            WHERE filing_year=2023
             GROUP BY filing_year,filing_period
-            ORDER BY filing_period;" | tee historical_lda_2024_reconciliation.csv
+            ORDER BY filing_period;" | tee historical_lda_2023_reconciliation.csv
           psql "$DATABASE_URL" -Atc "
             SELECT 'activities',count(*) FROM lda.activity a
-            JOIN lda.filing f USING(filing_uuid) WHERE f.filing_year=2024
-            UNION ALL SELECT 'filings',count(*) FROM lda.filing WHERE filing_year=2024;" |
-            tee historical_lda_2024_counts.txt
+            JOIN lda.filing f USING(filing_uuid) WHERE f.filing_year=2023
+            UNION ALL SELECT 'filings',count(*) FROM lda.filing WHERE filing_year=2023;" |
+            tee historical_lda_2023_counts.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: historical-lda-2024-reconciliation
+          name: historical-lda-2023-reconciliation
           path: |
-            historical_lda_2024_reconciliation.csv
-            historical_lda_2024_counts.txt
-            historical_bill_policy_evidence_2024.csv
-            historical_quant_pressure_2024.csv
-            historical_quant_audit_2024.csv
+            historical_lda_2023_reconciliation.csv
+            historical_lda_2023_counts.txt
+            historical_bill_policy_evidence_2023.csv
+            historical_quant_pressure_2023.csv
+            historical_quant_audit_2023.csv
           retention-days: 30
           # manual restart marker: 2026-11-11
