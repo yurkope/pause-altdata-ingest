@@ -25,7 +25,7 @@ def main():
  if isinstance(px,pd.Series): px=px.to_frame()
  horizons=[30,60,90,180]; out=[]
  for _,r in rows.iterrows():
-  start=qend(int(r.year),int(r.quarter_num))
+  start=qend(int(r.year),int(r.quarter_num))+pd.Timedelta(days=20)
   for h in horizons:
    end=start+pd.Timedelta(days=h)
    def first_on_after(ticker,dt):
