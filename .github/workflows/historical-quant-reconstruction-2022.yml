@@ -1,10 +1,10 @@
-name: Historical Quant reconstruction
+name: Historical Quant reconstruction 2022 activity-text-only
 
 on:
   push:
     branches: [vibe-lda-ingestion]
     paths:
-      - '.github/workflows/historical-quant-reconstruction.yml'
+      - '.github/workflows/historical-quant-reconstruction-2022.yml'
   workflow_dispatch:
 
 jobs:
