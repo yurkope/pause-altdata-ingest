@@ -1,0 +1,79 @@
+name: Contemporaneous lobbying universe backtest
+on:
+  workflow_dispatch:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - .github/workflows/contemporaneous-lobbying-universe.yml
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quant
+          POSTGRES_PASSWORD: quant
+          POSTGRES_DB: quant
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U quant -d quant" --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      PGPASSWORD: quant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install psycopg2-binary pandas numpy scipy yfinance
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2023-db-snapshot
+          path: /tmp/s23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2023-reconciliation
+          path: /tmp/q23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2024-db-snapshot
+          path: /tmp/s24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43155997811
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-quant-2024-scored
+          path: /tmp/q24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43166862991
+      - name: Restore frozen historical databases
+        run: |
+          createdb -h localhost -U quant q23
+          createdb -h localhost -U quant q24
+          pg_restore -h localhost -U quant -d q23 --no-owner /tmp/s23/historical_lda_2023.dump
+          pg_restore -h localhost -U quant -d q24 --no-owner /tmp/s24/historical_lda_2024.dump
+      - name: Export contemporaneous client-policy evidence
+        run: |
+          DATABASE_URL=postgresql://quant:quant@localhost:5432/q23 python signals/export_historical_client_policy_exposure.py --year 2023 --bill-evidence /tmp/q23/historical_bill_policy_evidence_2023.csv --output /tmp/exposure_2023.csv
+          DATABASE_URL=postgresql://quant:quant@localhost:5432/q24 python signals/export_historical_client_policy_exposure.py --year 2024 --bill-evidence /tmp/q24/historical_bill_policy_evidence_2024.csv --output /tmp/exposure_2024.csv
+      - name: Freeze deterministic SEC identity source
+        run: |
+          curl -fL -A 'Quant research contact research@example.com' https://www.sec.gov/files/company_tickers.json -o /tmp/sec_company_tickers.json
+          test -s /tmp/sec_company_tickers.json
+      - name: Run contemporaneous-universe test
+        run: |
+          python signals/backtest_contemporaneous_lobbying_universe.py --exposure /tmp/exposure_2023.csv --exposure /tmp/exposure_2024.csv --scores /tmp/q23/historical_quant_pressure_2023.csv --scores /tmp/q24/historical_quant_pressure_2024.csv --sec /tmp/sec_company_tickers.json --out /tmp/contemporaneous_universe_result.csv | tee /tmp/contemporaneous_universe.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contemporaneous-lobbying-universe-2023-2024
+          path: |
+            /tmp/exposure_2023.csv
+            /tmp/exposure_2024.csv
+            /tmp/contemporaneous_universe_result.csv
+            /tmp/contemporaneous_universe.log
+          retention-days: 30
+# rerun after year alias fix

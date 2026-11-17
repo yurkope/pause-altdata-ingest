@@ -1,0 +1,64 @@
+policy_code,ticker,exposure_basis,exposure_tier,include_primary
+AI_POLICY,NVDA,AI compute/platform,1,true
+AI_POLICY,AMD,AI compute/platform,1,true
+AI_POLICY,MSFT,AI platform/cloud,1,true
+AI_POLICY,GOOGL,AI platform/model provider,1,true
+AI_POLICY,META,AI platform/model provider,1,true
+AI_POLICY,AMZN,AI cloud/platform,1,true
+AI_POLICY,PLTR,AI software/platform,1,true
+CYBERSECURITY,CRWD,Cybersecurity pure-play,1,true
+CYBERSECURITY,PANW,Cybersecurity pure-play,1,true
+CYBERSECURITY,FTNT,Cybersecurity pure-play,1,true
+CYBERSECURITY,ZS,Cybersecurity pure-play,1,true
+CYBERSECURITY,OKTA,Identity/cybersecurity pure-play,1,true
+DIGITAL_ASSETS,COIN,Crypto exchange/infrastructure,1,true
+DIGITAL_ASSETS,HOOD,Crypto brokerage exposure,2,false
+DEFENSE_APPROPRIATIONS,LMT,Major defense contractor,1,true
+DEFENSE_APPROPRIATIONS,NOC,Major defense contractor,1,true
+DEFENSE_APPROPRIATIONS,RTX,Major defense contractor,1,true
+DEFENSE_APPROPRIATIONS,GD,Major defense contractor,1,true
+DEFENSE_APPROPRIATIONS,BA,Major defense contractor,2,false
+FAA_AVIATION,BA,Commercial aviation manufacturer,1,true
+FAA_AVIATION,GE,Aviation engines/services,1,true
+FAA_AVIATION,RTX,Aviation systems/engines,1,true
+FAA_AVIATION,LUV,US airline,1,true
+FAA_AVIATION,DAL,US airline,1,true
+FAA_AVIATION,UAL,US airline,1,true
+FAA_AVIATION,AAL,US airline,1,true
+BANK_CAPITAL,JPM,Large regulated bank,1,true
+BANK_CAPITAL,BAC,Large regulated bank,1,true
+BANK_CAPITAL,WFC,Large regulated bank,1,true
+BANK_CAPITAL,C,Large regulated bank,1,true
+BANK_CAPITAL,GS,Large regulated bank,1,true
+BANK_CAPITAL,MS,Large regulated bank,1,true
+BROADBAND_BEAD,T,US broadband provider,1,true
+BROADBAND_BEAD,VZ,US broadband provider,1,true
+BROADBAND_BEAD,CHTR,US broadband provider,1,true
+BROADBAND_BEAD,CMCSA,US broadband provider,1,true
+BROADBAND_BEAD,CSCO,Network equipment supplier,2,false
+CLEAN_ENERGY_TAX_IRA,FSLR,US solar manufacturer,1,true
+CLEAN_ENERGY_TAX_IRA,ENPH,Solar equipment,1,true
+CLEAN_ENERGY_TAX_IRA,NEE,Renewable power exposure,1,true
+CRITICAL_MINERALS_SUPPLY_CHAIN,MP,US rare-earth producer,1,true
+CRITICAL_MINERALS_SUPPLY_CHAIN,ALB,Lithium producer,1,true
+CRITICAL_MINERALS_SUPPLY_CHAIN,FCX,Copper/mining producer,1,true
+DRUG_PRICING,LLY,Branded pharmaceutical manufacturer,1,true
+DRUG_PRICING,PFE,Branded pharmaceutical manufacturer,1,true
+DRUG_PRICING,MRK,Branded pharmaceutical manufacturer,1,true
+DRUG_PRICING,ABBV,Branded pharmaceutical manufacturer,1,true
+DRUG_PRICING,BMY,Branded pharmaceutical manufacturer,1,true
+DRUG_PRICING,JNJ,Branded pharmaceutical manufacturer,1,true
+DRUG_PRICING,AMGN,Branded biopharma manufacturer,1,true
+DRUG_PRICING,GILD,Branded biopharma manufacturer,1,true
+PBM,CVS,Major PBM owner,1,true
+PBM,CI,Major PBM owner,1,true
+PBM,UNH,Major PBM owner,1,true
+AUTONOMOUS_VEHICLES,TSLA,Autonomous-driving developer/vehicle OEM,1,true
+AUTONOMOUS_VEHICLES,GM,Autonomous-driving/vehicle OEM,1,true
+AUTONOMOUS_VEHICLES,F,Vehicle OEM with autonomy exposure,1,true
+PATENT_POLICY,QCOM,IP licensing/patent-intensive technology,1,true
+PATENT_POLICY,AAPL,Patent-intensive technology,2,false
+TRADE_TARIFFS,STLD,US steel producer,1,true
+TRADE_TARIFFS,NUE,US steel producer,1,true
+TRADE_TARIFFS,CAT,Trade-exposed US industrial manufacturer,2,false
+TRADE_TARIFFS,DE,Trade-exposed US industrial manufacturer,2,false
