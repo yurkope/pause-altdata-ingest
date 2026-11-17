@@ -18,7 +18,7 @@ def main():
 ev AS (SELECT DISTINCT activity_id,label policy_code FROM labels UNION SELECT DISTINCT activity_id,policy_code FROM be),
 e AS (SELECT ev.*,pm.role,pm.parent FROM ev JOIN pm USING(policy_code)),
 r AS (SELECT e.* FROM e WHERE role='substantive' OR (role='parent' AND NOT EXISTS(SELECT 1 FROM e ch WHERE ch.activity_id=e.activity_id AND ch.parent=e.policy_code)))
-SELECT %s year,substring(f.filing_type from 2 for 1)::int quarter_num,r.policy_code,c.client_id,c.name,count(DISTINCT r.activity_id) activities,count(DISTINCT f.filing_uuid) filings
+SELECT %s AS reconstruction_year,substring(f.filing_type from 2 for 1)::int quarter_num,r.policy_code,c.client_id,c.name,count(DISTINCT r.activity_id) activities,count(DISTINCT f.filing_uuid) filings
 FROM r JOIN lda.activity a USING(activity_id) JOIN lda.filing f USING(filing_uuid) JOIN lda.client c USING(client_id) JOIN pm USING(policy_code)
 WHERE f.filing_year=%s AND f.filing_type IN('Q1','Q2','Q3','Q4') AND pm.role='substantive'
 GROUP BY 1,2,3,4,5 ORDER BY 2,3,5"""
