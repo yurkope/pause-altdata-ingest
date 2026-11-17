@@ -11,24 +11,45 @@ jobs:
     services:
       postgres:
         image: postgres:17
-        env: {POSTGRES_USER: quant, POSTGRES_PASSWORD: quant, POSTGRES_DB: quant}
-        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: quant
+          POSTGRES_PASSWORD: quant
+          POSTGRES_DB: quant
+        ports:
+          - 5432:5432
         options: --health-cmd "pg_isready -U quant -d quant" --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       PGPASSWORD: quant
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.13'}
+        with:
+          python-version: '3.13'
       - run: pip install psycopg2-binary pandas numpy scipy yfinance
       - uses: actions/download-artifact@v4
-        with: {name: historical-lda-2023-db-snapshot, path: /tmp/s23, github-token: ${{ secrets.GITHUB_TOKEN }}, run-id: 44022333699}
+        with:
+          name: historical-lda-2023-db-snapshot
+          path: /tmp/s23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
       - uses: actions/download-artifact@v4
-        with: {name: historical-lda-2023-reconciliation, path: /tmp/q23, github-token: ${{ secrets.GITHUB_TOKEN }}, run-id: 44022333699}
+        with:
+          name: historical-lda-2023-reconciliation
+          path: /tmp/q23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
       - uses: actions/download-artifact@v4
-        with: {name: historical-lda-2024-db-snapshot, path: /tmp/s24, github-token: ${{ secrets.GITHUB_TOKEN }}, run-id: 43155997811}
+        with:
+          name: historical-lda-2024-db-snapshot
+          path: /tmp/s24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43155997811
       - uses: actions/download-artifact@v4
-        with: {name: historical-quant-2024-scored, path: /tmp/q24, github-token: ${{ secrets.GITHUB_TOKEN }}, run-id: 43166862991}
+        with:
+          name: historical-quant-2024-scored
+          path: /tmp/q24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43166862991
       - name: Restore frozen historical databases
         run: |
           createdb -h localhost -U quant q23
