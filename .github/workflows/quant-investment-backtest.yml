@@ -44,3 +44,4 @@ jobs:
             /tmp/stress.log
           retention-days: 30
 # point-in-time rerun: LDA quarter-end + 20 days
+# rerun faster adversarial placebo
