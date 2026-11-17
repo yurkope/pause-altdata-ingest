@@ -10,7 +10,7 @@ def norm(s):
  return "".join(w)
 def main():
  ap=argparse.ArgumentParser();ap.add_argument("--exposure",action="append",required=True);ap.add_argument("--scores",action="append",required=True);ap.add_argument("--sec",required=True);ap.add_argument("--out",required=True);a=ap.parse_args()
- ex=pd.concat([pd.read_csv(x) for x in a.exposure]); sc=pd.concat([pd.read_csv(x) for x in a.scores])
+ ex=pd.concat([pd.read_csv(x) for x in a.exposure]); ex=ex.rename(columns={"reconstruction_year":"year"}); sc=pd.concat([pd.read_csv(x) for x in a.scores])
  sec=json.load(open(a.sec)); vals=sec.values() if isinstance(sec,dict) else sec
  names={}
  for x in vals:
