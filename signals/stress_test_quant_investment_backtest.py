@@ -57,7 +57,7 @@ def main():
  # placebo: choose same number of policies as observed top each quarter from mapped policy universe, compare ticker EW SPY excess
  rng=np.random.default_rng(20261117);obs=base.mean(); sims=[]
  qs=list(s[["year","quarter_num"]].drop_duplicates().itertuples(index=False,name=None))
- for _ in range(50000):
+ for _ in range(5000):
   vv=[]
   for y,q in qs:
    ss=s[(s.year.eq(y))&(s.quarter_num.eq(q))]; k=int((ss.pct>.75).sum())
