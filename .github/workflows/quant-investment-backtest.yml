@@ -1,43 +1,35 @@
 name: Quant investment backtest
-
 on:
-  push:
-    branches: [vibe-lda-ingestion]
-    paths:
-      - '.github/workflows/quant-investment-backtest.yml'
   workflow_dispatch:
-
+  push:
+    branches:
+      - vibe-lda-ingestion
+    paths:
+      - .github/workflows/quant-investment-backtest.yml
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.13'}
+        with:
+          python-version: '3.13'
       - run: pip install pandas numpy scipy yfinance
-      - name: Download frozen historical Quant artifacts
-        env: {GH_TOKEN: ${{ github.token }}}
-        run: |
-          curl -L -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${{ github.repository }}/actions/artifacts/14306858801/zip -o /tmp/q23.zip
-          curl -L -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${{ github.repository }}/actions/artifacts/13921205471/zip -o /tmp/q24.zip
-          mkdir -p /tmp/q23 /tmp/q24
-          unzip -q /tmp/q23.zip -d /tmp/q23
-          unzip -q /tmp/q24.zip -d /tmp/q24
-          test -s /tmp/q23/historical_quant_pressure_2023.csv
-          test -s /tmp/q24/historical_quant_pressure_2024.csv
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2023-reconciliation
+          path: /tmp/q23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-quant-2024-scored
+          path: /tmp/q24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43166862991
       - name: Run frozen investment backtest
         run: |
-          python signals/run_quant_investment_backtest.py \
-            --q23 /tmp/q23/historical_quant_pressure_2023.csv \
-            --q24 /tmp/q24/historical_quant_pressure_2024.csv \
-            --q25 signals/quant_pressure_2025_frozen_mapped.csv \
-            --map signals/congress_trade_policy_exposure_map_v1.csv \
-            --out /tmp/quant_investment_backtest_detail.csv | tee /tmp/backtest.log
+          python signals/run_quant_investment_backtest.py --q23 /tmp/q23/historical_quant_pressure_2023.csv --q24 /tmp/q24/historical_quant_pressure_2024.csv --q25 signals/quant_pressure_2025_frozen_mapped.csv --map signals/congress_trade_policy_exposure_map_v1.csv --out /tmp/quant_investment_backtest_detail.csv | tee /tmp/backtest.log
       - uses: actions/upload-artifact@v4
         with:
           name: quant-investment-backtest-2023-2025
