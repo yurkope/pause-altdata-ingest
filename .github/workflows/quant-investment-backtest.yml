@@ -30,6 +30,9 @@ jobs:
       - name: Run frozen investment backtest
         run: |
           python signals/run_quant_investment_backtest.py --q23 /tmp/q23/historical_quant_pressure_2023.csv --q24 /tmp/q24/historical_quant_pressure_2024.csv --q25 signals/quant_pressure_2025_frozen_mapped.csv --map signals/congress_trade_policy_exposure_map_v1.csv --out /tmp/quant_investment_backtest_detail.csv | tee /tmp/backtest.log
+      - name: Run adversarial stress tests
+        run: |
+          python signals/stress_test_quant_investment_backtest.py --q23 /tmp/q23/historical_quant_pressure_2023.csv --q24 /tmp/q24/historical_quant_pressure_2024.csv --q25 signals/quant_pressure_2025_frozen_mapped.csv --map signals/congress_trade_policy_exposure_map_v1.csv --out /tmp/quant_investment_stress_detail.csv | tee /tmp/stress.log
       - uses: actions/upload-artifact@v4
         with:
           name: quant-investment-backtest-2023-2025
@@ -37,5 +40,7 @@ jobs:
             /tmp/quant_investment_backtest_detail.csv
             /tmp/quant_investment_backtest_summary.csv
             /tmp/backtest.log
+            /tmp/quant_investment_stress_detail.csv
+            /tmp/stress.log
           retention-days: 30
 # point-in-time rerun: LDA quarter-end + 20 days
