@@ -3,13 +3,13 @@ name: Quant investment backtest
 on:
   push:
     branches: [vibe-lda-ingestion]
-    paths: ['.github/workflows/quant-investment-backtest.yml']
+    paths:\n      - '.github/workflows/quant-investment-backtest.yml'
   workflow_dispatch:
 
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    permissions: {contents: read, actions: read}
+    permissions:\n      contents: read\n      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
