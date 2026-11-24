@@ -1,0 +1,48 @@
+name: QA contemporaneous investment universe
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - .github/workflows/qa-contemporaneous-universe.yml
+  workflow_dispatch:
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install pandas
+      - uses: actions/download-artifact@v4
+        with:
+          name: contemporaneous-lobbying-universe-2023-2024
+          path: /tmp/u
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44163229692
+      - name: Fetch SEC identity reference independently
+        run: |
+          curl -fL -A 'Quant research contact research@example.com' https://www.sec.gov/files/company_tickers.json -o /tmp/sec.json
+      - name: Audit identity matches
+        run: |
+          python signals/qa_contemporaneous_identity_matches.py --exposure /tmp/u/exposure_2023.csv --exposure /tmp/u/exposure_2024.csv --sec /tmp/sec.json --out /tmp/identity_qa.csv | tee /tmp/identity_qa.log
+      - name: Independent return artifact checks
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          p='/tmp/u/contemporaneous_universe_result.csv';d=pd.read_csv(p)
+          assert not d.duplicated(['year','quarter','ticker']).any(), 'duplicate ticker-quarter weights'
+          q=d.groupby(['year','quarter']).excess.mean()
+          print({'rows':len(d),'quarters':len(q),'mean':q.mean(),'min':q.min(),'max':q.max(),'unique_tickers':d.ticker.nunique()})
+          print('quarter_counts')
+          print(d.groupby(['year','quarter']).ticker.nunique().to_string())
+          print('policy_counts')
+          print(d.groupby('policy').ticker.nunique().sort_values(ascending=False).to_string())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-contemporaneous-universe
+          path: |
+            /tmp/identity_qa.csv
+            /tmp/identity_qa.log
+          retention-days: 30
