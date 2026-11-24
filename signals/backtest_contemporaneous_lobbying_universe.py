@@ -16,7 +16,7 @@ def main():
  for x in vals:
   n=norm(x.get("title",""));t=x.get("ticker")
   if n and t:names.setdefault(n,set()).add(t)
- ex["n"]=ex.name.map(norm);ex["ticker"]=ex.n.map(lambda n:next(iter(names[n])) if n in names and len(names[n])==1 else None)
+ ex["n"]=ex.name.map(norm);ex["ticker"]=ex.n.map(lambda n:next(iter(names[n])) if n in names and len(names[n])==1 else None)\n ex=ex[ex.n.str.len().ge(5)]\n ex=ex[ex.ticker.fillna("").str.match(r"^[A-Z]{1,5}([.-][A-Z])?$")]
  ex=ex[ex.ticker.notna()].copy()
  sc=sc.sort_values(["policy_code","year","quarter_num"]) if "year" in sc else sc
  if "year" not in sc.columns: raise SystemExit("score files must include year")
