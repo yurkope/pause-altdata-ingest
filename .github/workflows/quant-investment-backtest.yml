@@ -1,0 +1,47 @@
+name: Quant investment backtest
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - vibe-lda-ingestion
+    paths:
+      - .github/workflows/quant-investment-backtest.yml
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install pandas numpy scipy yfinance
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2023-reconciliation
+          path: /tmp/q23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-quant-2024-scored
+          path: /tmp/q24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43166862991
+      - name: Run frozen investment backtest
+        run: |
+          python signals/run_quant_investment_backtest.py --q23 /tmp/q23/historical_quant_pressure_2023.csv --q24 /tmp/q24/historical_quant_pressure_2024.csv --q25 signals/quant_pressure_2025_frozen_mapped.csv --map signals/congress_trade_policy_exposure_map_v1.csv --out /tmp/quant_investment_backtest_detail.csv | tee /tmp/backtest.log
+      - name: Run adversarial stress tests
+        run: |
+          python signals/stress_test_quant_investment_backtest.py --q23 /tmp/q23/historical_quant_pressure_2023.csv --q24 /tmp/q24/historical_quant_pressure_2024.csv --q25 signals/quant_pressure_2025_frozen_mapped.csv --map signals/congress_trade_policy_exposure_map_v1.csv --out /tmp/quant_investment_stress_detail.csv | tee /tmp/stress.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quant-investment-backtest-2023-2025
+          path: |
+            /tmp/quant_investment_backtest_detail.csv
+            /tmp/quant_investment_backtest_summary.csv
+            /tmp/backtest.log
+            /tmp/quant_investment_stress_detail.csv
+            /tmp/stress.log
+          retention-days: 30
+# point-in-time rerun: LDA quarter-end + 20 days
+# rerun faster adversarial placebo
