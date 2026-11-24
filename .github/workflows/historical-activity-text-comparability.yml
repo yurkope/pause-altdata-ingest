@@ -1,0 +1,81 @@
+name: Historical Quant activity-text comparability
+on:
+  push:
+    branches: [vibe-lda-ingestion]
+    paths:
+      - .github/workflows/historical-activity-text-comparability.yml
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: quant
+          POSTGRES_PASSWORD: quant
+          POSTGRES_DB: quant
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U quant -d quant" --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      PGPASSWORD: quant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install psycopg2-binary python-dotenv pandas scipy
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2023-db-snapshot
+          path: /tmp/s23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2023-reconciliation
+          path: /tmp/q23
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44022333699
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-lda-2024-db-snapshot
+          path: /tmp/s24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43155997811
+      - uses: actions/download-artifact@v4
+        with:
+          name: historical-quant-2024-scored
+          path: /tmp/q24
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43166862991
+      - run: |
+          createdb -h localhost -U quant q23
+          createdb -h localhost -U quant q24
+          pg_restore -h localhost -U quant -d q23 --no-owner /tmp/s23/historical_lda_2023.dump
+          pg_restore -h localhost -U quant -d q24 --no-owner /tmp/s24/historical_lda_2024.dump
+          DATABASE_URL=postgresql://quant:quant@localhost:5432/q23 python signals/score_historical_quant.py --year 2023 --bill-evidence /tmp/q23/historical_bill_policy_evidence_2023.csv --activity-text-only --output /tmp/t23.csv --audit-output /tmp/a23.csv
+          DATABASE_URL=postgresql://quant:quant@localhost:5432/q24 python signals/score_historical_quant.py --year 2024 --bill-evidence /tmp/q24/historical_bill_policy_evidence_2024.csv --activity-text-only --output /tmp/t24.csv --audit-output /tmp/a24.csv
+      - name: Compare ranks to full historical Quant
+        run: |
+          python - <<'PY' | tee /tmp/compare.log
+          import pandas as pd
+          from scipy.stats import spearmanr
+          for y in (2023,2024):
+            a=pd.read_csv(f'/tmp/t{str(y)[-2:]}.csv');b=pd.read_csv(f'/tmp/q{str(y)[-2:]}/historical_quant_pressure_{y}.csv')
+            m=a.merge(b,on=['quarter_num','policy_code'],suffixes=('_text','_full'))
+            print('YEAR',y,'overlap',len(m))
+            for q,g in m.groupby('quarter_num'):
+              r=spearmanr(g.economic_pressure_score_text,g.economic_pressure_score_full)
+              topa=set(g.nlargest(max(1,len(g)//4),'economic_pressure_score_text').policy_code);topb=set(g.nlargest(max(1,len(g)//4),'economic_pressure_score_full').policy_code)
+              print(q,'spearman',r.statistic,'top_quartile_jaccard',len(topa&topb)/len(topa|topb))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-activity-text-comparability
+          path: |
+            /tmp/t23.csv
+            /tmp/t24.csv
+            /tmp/compare.log
+          retention-days: 30
