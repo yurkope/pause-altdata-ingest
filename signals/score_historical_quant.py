@@ -24,13 +24,13 @@ PARENT_OF={"DRUG_340B":"DRUG_BIOMEDICAL_POLICY","DRUG_PRICING":"DRUG_BIOMEDICAL_
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--year",type=int,required=True)
-    ap.add_argument("--bill-evidence",required=True);ap.add_argument("--output",required=True)
+    ap.add_argument("--bill-evidence",required=True);ap.add_argument("--activity-text-only",action="store_true");ap.add_argument("--output",required=True)
     ap.add_argument("--audit-output",required=True);args=ap.parse_args();load_dotenv()
     source=open("signals/activity_policy_pressure_v1.sql",encoding="utf-8").read()
     prefix=source.split("), fl AS",1)[0]+")"
     prefix=prefix.replace("f.filing_year=2025",f"f.filing_year={args.year}")
     labels=set(re.findall(r"\('([A-Z][A-Z0-9_]+)'\s*,",prefix))
-    bill_rows=list(csv.DictReader(open(args.bill_evidence,encoding="utf-8")))
+    bill_rows=[] if args.activity_text_only else list(csv.DictReader(open(args.bill_evidence,encoding="utf-8")))
     labels.update(r["policy_code"] for r in bill_rows)
     meta=[]
     for p in sorted(labels):
